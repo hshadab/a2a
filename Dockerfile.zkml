@@ -1,31 +1,7 @@
-# Multi-stage Dockerfile for agents with Jolt Atlas zkML support
-# Stage 1: Build Jolt Atlas and zkml-cli from source
-FROM rust:1.75-slim as rust-builder
+# Dockerfile for agents with zkML support
+# Note: Real Jolt Atlas proofs require building zkml-cli separately
+# This Dockerfile provides the Python runtime with simulated proof fallback
 
-RUN apt-get update && apt-get install -y \
-    git \
-    pkg-config \
-    libssl-dev \
-    build-essential \
-    cmake \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set cargo to use sparse registry for faster downloads
-ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
-
-WORKDIR /build
-
-# Clone jolt-atlas directly (Render doesn't fetch submodules)
-RUN git clone --depth 1 https://github.com/ICME-Lab/jolt-atlas.git /build/jolt-atlas
-
-# Copy the zkml-cli wrapper
-COPY zkml-cli/ /build/zkml-cli/
-
-# Build zkml-cli which uses jolt-atlas
-WORKDIR /build/zkml-cli
-RUN cargo build --release || echo "zkml-cli build completed with warnings"
-
-# Stage 2: Final Python runtime
 FROM python:3.11-slim
 
 ARG AGENT_TYPE=scout
@@ -36,10 +12,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
-
-# Copy zkml-cli binary
-COPY --from=rust-builder /build/zkml-cli/target/release/zkml-cli /usr/local/bin/zkml-cli
 
 # Copy shared code
 COPY shared/ /app/shared/
@@ -52,17 +26,27 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy agent-specific code and requirements
 COPY agents/${AGENT_TYPE}/ /app/
+
+# Install agent-specific dependencies
 RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 
-# Copy Jolt Atlas models
-COPY agents/${AGENT_TYPE}/models/jolt/ /app/models/jolt/
+# Create models directory for jolt models (optional)
+RUN mkdir -p /app/models/jolt
+
+# Copy Jolt Atlas models if they exist
+COPY agents/${AGENT_TYPE}/models/ /app/models/ 2>/dev/null || true
 
 # Set model paths
 ENV JOLT_MODEL_DIR=/app/models/jolt
 ENV ZKML_CLI_PATH=/usr/local/bin/zkml-cli
+ENV PYTHONPATH=/app
 
 # Port from environment
 ENV PORT=8000
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
 # Run the agent
-CMD python -m uvicorn main:app --host 0.0.0.0 --port ${PORT}
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
