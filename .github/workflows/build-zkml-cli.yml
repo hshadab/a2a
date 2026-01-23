@@ -63,16 +63,24 @@ jobs:
       - name: Build zkml-cli
         working-directory: zkml-cli
         run: |
-          echo "Starting Rust build..."
-          cargo build --release 2>&1 | tee build.log || {
-            echo "=== Build failed, showing last 100 lines of log ==="
-            tail -100 build.log
+          echo "=== Cargo version ==="
+          cargo --version
+          rustc --version
+          echo "=== Building zkml-cli binary ==="
+          cargo build --release --bin zkml-cli -vv 2>&1 | tee build.log
+          BUILD_EXIT=$?
+          echo "=== Build exit code: $BUILD_EXIT ==="
+          if [ $BUILD_EXIT -ne 0 ]; then
+            echo "=== Build failed, showing last 200 lines of log ==="
+            tail -200 build.log
             exit 1
-          }
+          fi
           echo "=== Build completed, listing target/release ==="
-          ls -la target/release/ | head -30
-          echo "=== Looking for executables ==="
-          find target/release -maxdepth 1 -type f -executable 2>/dev/null | head -10
+          ls -la target/release/ | grep -v '\.d$' | head -30
+          echo "=== Looking for zkml-cli specifically ==="
+          ls -la target/release/zkml-cli 2>/dev/null || echo "zkml-cli not found!"
+          echo "=== All executables ==="
+          find target/release -maxdepth 1 -type f -executable 2>/dev/null
 
       - name: Verify binary
         run: |
