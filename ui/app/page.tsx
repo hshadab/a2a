@@ -25,6 +25,7 @@ import {
   Clock,
   RefreshCw,
 } from 'lucide-react';
+import AgentTriangle from '@/components/AgentTriangle';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 
@@ -122,7 +123,22 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Agent Status */}
+      {/* Agent Triangle Visualization */}
+      <section className="mb-8">
+        <AgentTriangle
+          scoutState={health?.running ? 'active' : 'idle'}
+          policyState={lastEvent?.type.includes('POLICY') ? (lastEvent?.type === 'POLICY_PROVING' ? 'proving' : 'working') : 'active'}
+          analystState={lastEvent?.type.includes('ANALYST') ? (lastEvent?.type === 'ANALYST_PROVING' ? 'proving' : 'working') : 'active'}
+          lastEvent={lastEvent}
+          stats={stats ? {
+            policyPaid: stats.policy_paid_usdc,
+            analystPaid: stats.analyst_paid_usdc,
+            totalUrls: stats.total_urls,
+          } : undefined}
+        />
+      </section>
+
+      {/* Agent Details */}
       <section className="grid grid-cols-3 gap-4 mb-8">
         <AgentCard
           name="Scout"

@@ -82,3 +82,232 @@ body {
 .animate-active {
   animation: activePulse 2s ease-in-out infinite;
 }
+
+/* Agent Triangle Visualization */
+.agent-triangle {
+  position: relative;
+  width: 100%;
+  height: 400px;
+}
+
+.agent-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.agent-node:hover {
+  transform: scale(1.05);
+}
+
+.agent-node.active {
+  filter: drop-shadow(0 0 20px currentColor);
+}
+
+.agent-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.agent-avatar::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.3;
+}
+
+.agent-avatar.working::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px dashed currentColor;
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Connection lines */
+.connection-line {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.connection-path {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.connection-path.idle {
+  stroke: #374151;
+  stroke-dasharray: 8 4;
+}
+
+.connection-path.active {
+  stroke: url(#gradient-active);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* Animated particles along path */
+@keyframes flowParticle {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.flow-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  offset-rotate: 0deg;
+  animation: flowParticle 2s linear infinite;
+}
+
+.flow-particle:nth-child(2) { animation-delay: 0.4s; }
+.flow-particle:nth-child(3) { animation-delay: 0.8s; }
+.flow-particle:nth-child(4) { animation-delay: 1.2s; }
+.flow-particle:nth-child(5) { animation-delay: 1.6s; }
+
+/* Marching ants animation */
+@keyframes marchingAnts {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.marching-ants {
+  animation: marchingAnts 0.5s linear infinite;
+}
+
+/* Pulse ring effect */
+@keyframes pulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: pulseRing 1.5s ease-out infinite;
+}
+
+/* Agent expressions */
+.agent-eyes {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.agent-eye {
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  border-radius: 50%;
+  position: relative;
+}
+
+.agent-eye.looking-left::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #000;
+  border-radius: 50%;
+  top: 3px;
+  left: 1px;
+}
+
+.agent-eye.looking-right::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #000;
+  border-radius: 50%;
+  top: 3px;
+  right: 1px;
+}
+
+.agent-eye.looking-down::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #000;
+  border-radius: 50%;
+  bottom: 1px;
+  left: 3px;
+}
+
+/* Treasury */
+.treasury-node {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Data flow indicators */
+@keyframes dataFlow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.data-indicator {
+  animation: dataFlow 1s ease-in-out infinite;
+}
+
+/* Proof glow */
+@keyframes proofGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+}
+
+.proving {
+  animation: proofGlow 0.5s ease-in-out infinite;
+}
