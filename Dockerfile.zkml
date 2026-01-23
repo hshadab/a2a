@@ -12,13 +12,13 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Try to download pre-built zkml-cli binary from GitHub Releases
+# Try to download pre-built Jolt Atlas proof binary from zkx402 releases
 # Falls back gracefully if not available (uses simulated proofs)
-RUN curl -fsSL -o /usr/local/bin/zkml-cli \
-    "https://github.com/hshadab/a2a/releases/download/zkml-cli-v1.0.0/zkml-cli" 2>/dev/null \
-    && chmod +x /usr/local/bin/zkml-cli \
-    && echo "zkml-cli downloaded successfully" \
-    || echo "zkml-cli not available yet, will use simulated proofs"
+RUN curl -fsSL -o /usr/local/bin/proof_json_output \
+    "https://github.com/hshadab/zkx402/releases/download/jolt-binary-v1/proof_json_output" 2>/dev/null \
+    && chmod +x /usr/local/bin/proof_json_output \
+    && echo "Jolt Atlas prover downloaded successfully (143MB)" \
+    || echo "Prover not available, will use simulated proofs"
 
 # Create the directory structure matching the original repo
 WORKDIR /opt/render/project/src
@@ -40,7 +40,7 @@ RUN if [ -f agents/${AGENT_TYPE}/requirements.txt ]; then \
 
 # Set environment
 ENV JOLT_MODEL_DIR=/opt/render/project/src/agents/${AGENT_TYPE}/models/jolt
-ENV ZKML_CLI_PATH=/usr/local/bin/zkml-cli
+ENV ZKML_CLI_PATH=/usr/local/bin/proof_json_output
 ENV PYTHONPATH=/opt/render/project/src
 
 # Port from environment (Render sets PORT)
