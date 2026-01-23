@@ -138,188 +138,220 @@ export default function AgentTriangle({
     }
   };
 
+  // Fixed dimensions for consistent layout
+  const WIDTH = 480;
+  const HEIGHT = 380;
+
+  // Agent positions (fixed coordinates)
+  const positions = {
+    scout: { x: WIDTH / 2, y: 60 },
+    policy: { x: 100, y: 280 },
+    analyst: { x: WIDTH - 100, y: 280 },
+    treasury: { x: WIDTH / 2, y: 340 },
+  };
+
   return (
-    <div className="agent-triangle bg-gray-900/30 rounded-xl border border-gray-800 p-6">
-      {/* SVG for connection lines */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-        <defs>
-          <linearGradient id="gradient-yellow" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#fbbf24" stopOpacity="0" />
-            <stop offset="50%" stopColor="#fbbf24" stopOpacity="1" />
-            <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="gradient-purple" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#a855f7" stopOpacity="0" />
-            <stop offset="50%" stopColor="#a855f7" stopOpacity="1" />
-            <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="gradient-cyan" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0" />
-            <stop offset="50%" stopColor="#22d3ee" stopOpacity="1" />
-            <stop offset="100%" stopColor="#22d3ee" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* Scout to Policy line */}
-        <path
-          d="M 200 120 Q 120 200 100 280"
-          className={`connection-path ${derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('policy') ? 'active' : 'idle'}`}
-          style={{
-            stroke: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('policy')
-              ? getConnectionColor(derivedStates.connType)
-              : '#374151',
-            strokeDasharray: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('policy') ? 'none' : '8 4',
-          }}
-        />
-
-        {/* Scout to Analyst line */}
-        <path
-          d="M 280 120 Q 360 200 380 280"
-          className={`connection-path ${derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('analyst') ? 'active' : 'idle'}`}
-          style={{
-            stroke: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('analyst')
-              ? getConnectionColor(derivedStates.connType)
-              : '#374151',
-            strokeDasharray: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('analyst') ? 'none' : '8 4',
-          }}
-        />
-
-        {/* Policy to Analyst line */}
-        <path
-          d="M 140 320 L 340 320"
-          className={`connection-path ${derivedStates.conn?.includes('policy') && derivedStates.conn?.includes('analyst') ? 'active' : 'idle'}`}
-          style={{
-            stroke: derivedStates.conn?.includes('policy') && derivedStates.conn?.includes('analyst')
-              ? getConnectionColor(derivedStates.connType)
-              : '#374151',
-            strokeDasharray: derivedStates.conn?.includes('policy') && derivedStates.conn?.includes('analyst') ? 'none' : '8 4',
-          }}
-        />
-
-        {/* Animated particles */}
-        {particles.map(particle => (
-          <circle
-            key={particle.id}
-            r="5"
-            fill={getConnectionColor(particle.type as ConnectionState)}
+    <div className="flex justify-center">
+      <div
+        className="bg-gray-900/30 rounded-xl border border-gray-800 p-4 relative"
+        style={{ width: WIDTH, height: HEIGHT }}
+      >
+        {/* SVG for connection lines */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={WIDTH}
+          height={HEIGHT}
+          style={{ zIndex: 0 }}
+        >
+          {/* Scout to Policy line */}
+          <line
+            x1={positions.scout.x}
+            y1={positions.scout.y + 50}
+            x2={positions.policy.x}
+            y2={positions.policy.y - 50}
+            className="connection-path"
             style={{
-              filter: `drop-shadow(0 0 6px ${getConnectionColor(particle.type as ConnectionState)})`,
+              stroke: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('policy')
+                ? getConnectionColor(derivedStates.connType)
+                : '#374151',
+              strokeWidth: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('policy') ? 3 : 2,
+              strokeDasharray: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('policy') ? 'none' : '8 4',
             }}
-          >
-            <animateMotion
-              dur="1.5s"
-              repeatCount="1"
-              path={
-                particle.connection === 'scout-policy' ? "M 200 120 Q 120 200 100 280" :
-                particle.connection === 'policy-scout' ? "M 100 280 Q 120 200 200 120" :
-                particle.connection === 'scout-analyst' ? "M 280 120 Q 360 200 380 280" :
-                particle.connection === 'analyst-scout' ? "M 380 280 Q 360 200 280 120" :
-                "M 140 320 L 340 320"
+          />
+
+          {/* Scout to Analyst line */}
+          <line
+            x1={positions.scout.x}
+            y1={positions.scout.y + 50}
+            x2={positions.analyst.x}
+            y2={positions.analyst.y - 50}
+            className="connection-path"
+            style={{
+              stroke: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('analyst')
+                ? getConnectionColor(derivedStates.connType)
+                : '#374151',
+              strokeWidth: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('analyst') ? 3 : 2,
+              strokeDasharray: derivedStates.conn?.includes('scout') && derivedStates.conn?.includes('analyst') ? 'none' : '8 4',
+            }}
+          />
+
+          {/* Policy to Analyst line */}
+          <line
+            x1={positions.policy.x + 50}
+            y1={positions.policy.y}
+            x2={positions.analyst.x - 50}
+            y2={positions.analyst.y}
+            className="connection-path"
+            style={{
+              stroke: derivedStates.conn?.includes('policy') && derivedStates.conn?.includes('analyst')
+                ? getConnectionColor(derivedStates.connType)
+                : '#374151',
+              strokeWidth: derivedStates.conn?.includes('policy') && derivedStates.conn?.includes('analyst') ? 3 : 2,
+              strokeDasharray: derivedStates.conn?.includes('policy') && derivedStates.conn?.includes('analyst') ? 'none' : '8 4',
+            }}
+          />
+
+          {/* Animated particles */}
+          {particles.map(particle => {
+            const getPath = () => {
+              switch (particle.connection) {
+                case 'scout-policy':
+                  return `M ${positions.scout.x} ${positions.scout.y + 50} L ${positions.policy.x} ${positions.policy.y - 50}`;
+                case 'policy-scout':
+                  return `M ${positions.policy.x} ${positions.policy.y - 50} L ${positions.scout.x} ${positions.scout.y + 50}`;
+                case 'scout-analyst':
+                  return `M ${positions.scout.x} ${positions.scout.y + 50} L ${positions.analyst.x} ${positions.analyst.y - 50}`;
+                case 'analyst-scout':
+                  return `M ${positions.analyst.x} ${positions.analyst.y - 50} L ${positions.scout.x} ${positions.scout.y + 50}`;
+                default:
+                  return `M ${positions.policy.x + 50} ${positions.policy.y} L ${positions.analyst.x - 50} ${positions.analyst.y}`;
               }
-            />
-          </circle>
-        ))}
-      </svg>
+            };
+            return (
+              <circle
+                key={particle.id}
+                r="6"
+                fill={getConnectionColor(particle.type as ConnectionState)}
+                style={{
+                  filter: `drop-shadow(0 0 8px ${getConnectionColor(particle.type as ConnectionState)})`,
+                }}
+              >
+                <animateMotion dur="1s" repeatCount="1" path={getPath()} />
+              </circle>
+            );
+          })}
+        </svg>
 
-      {/* Scout Agent - Top */}
-      <div
-        className={`agent-node ${derivedStates.scout !== 'idle' ? 'active' : ''}`}
-        style={{ top: '20px', left: '50%', transform: 'translateX(-50%)', color: '#3b82f6' }}
-      >
-        {pulsingAgent === 'scout' && <div className="pulse-ring" />}
-        <div className={`agent-avatar bg-blue-500/20 border-2 border-blue-500 ${derivedStates.scout === 'proving' ? 'proving' : ''} ${derivedStates.scout === 'working' ? 'working' : ''}`}>
-          <div className="flex flex-col items-center">
-            <AgentFace
-              expression={derivedStates.scout === 'working' ? 'focused' : derivedStates.scout === 'active' ? 'happy' : 'neutral'}
-              eyeDirection={getEyeDirection('scout')}
-              color="#3b82f6"
-            />
-            <span className="text-2xl mt-1">🔭</span>
+        {/* Scout Agent - Top */}
+        <div
+          className={`absolute flex flex-col items-center ${derivedStates.scout !== 'idle' ? 'active' : ''}`}
+          style={{
+            left: positions.scout.x,
+            top: positions.scout.y,
+            transform: 'translate(-50%, -50%)',
+            color: '#3b82f6'
+          }}
+        >
+          {pulsingAgent === 'scout' && <div className="pulse-ring" style={{ width: 80, height: 80 }} />}
+          <div className={`w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center ${derivedStates.scout === 'proving' ? 'proving' : ''} ${derivedStates.scout === 'working' ? 'working' : ''}`}>
+            <div className="flex flex-col items-center">
+              <AgentFace
+                expression={derivedStates.scout === 'working' ? 'focused' : derivedStates.scout === 'active' ? 'happy' : 'neutral'}
+                eyeDirection={getEyeDirection('scout')}
+                color="#3b82f6"
+              />
+              <span className="text-lg">🔭</span>
+            </div>
           </div>
+          <span className="mt-1 text-sm font-semibold text-blue-400">Scout</span>
+          <span className="text-xs text-gray-500">Explorer</span>
         </div>
-        <span className="mt-2 font-semibold text-blue-400">Scout</span>
-        <span className="text-xs text-gray-500">Explorer</span>
-        {derivedStates.scout === 'working' && (
-          <span className="text-xs text-yellow-400 mt-1 animate-pulse">Discovering...</span>
-        )}
-      </div>
 
-      {/* Policy Agent - Bottom Left */}
-      <div
-        className={`agent-node ${derivedStates.policy !== 'idle' ? 'active' : ''}`}
-        style={{ bottom: '60px', left: '60px', color: '#a855f7' }}
-      >
-        {pulsingAgent === 'policy' && <div className="pulse-ring" />}
-        <div className={`agent-avatar bg-purple-500/20 border-2 border-purple-500 ${derivedStates.policy === 'proving' ? 'proving' : ''} ${derivedStates.policy === 'working' ? 'working' : ''}`}>
-          <div className="flex flex-col items-center">
-            <AgentFace
-              expression={derivedStates.policy === 'proving' ? 'thinking' : derivedStates.policy === 'active' ? 'stern' : 'neutral'}
-              eyeDirection={getEyeDirection('policy')}
-              color="#a855f7"
-            />
-            <span className="text-2xl mt-1">⚖️</span>
+        {/* Policy Agent - Bottom Left */}
+        <div
+          className={`absolute flex flex-col items-center ${derivedStates.policy !== 'idle' ? 'active' : ''}`}
+          style={{
+            left: positions.policy.x,
+            top: positions.policy.y,
+            transform: 'translate(-50%, -50%)',
+            color: '#a855f7'
+          }}
+        >
+          {pulsingAgent === 'policy' && <div className="pulse-ring" style={{ width: 80, height: 80 }} />}
+          <div className={`w-20 h-20 rounded-full bg-purple-500/20 border-2 border-purple-500 flex items-center justify-center ${derivedStates.policy === 'proving' ? 'proving' : ''} ${derivedStates.policy === 'working' ? 'working' : ''}`}>
+            <div className="flex flex-col items-center">
+              <AgentFace
+                expression={derivedStates.policy === 'proving' ? 'thinking' : derivedStates.policy === 'active' ? 'stern' : 'neutral'}
+                eyeDirection={getEyeDirection('policy')}
+                color="#a855f7"
+              />
+              <span className="text-lg">⚖️</span>
+            </div>
           </div>
+          <span className="mt-1 text-sm font-semibold text-purple-400">Policy</span>
+          <span className="text-xs text-gray-500">Gatekeeper</span>
+          {stats && (
+            <span className="text-xs text-purple-300">${stats.policyPaid.toFixed(3)}</span>
+          )}
         </div>
-        <span className="mt-2 font-semibold text-purple-400">Policy</span>
-        <span className="text-xs text-gray-500">Gatekeeper</span>
-        {derivedStates.policy === 'proving' && (
-          <span className="text-xs text-cyan-400 mt-1 animate-pulse">Generating proof...</span>
-        )}
-        {stats && (
-          <span className="text-xs text-purple-300 mt-1">${stats.policyPaid.toFixed(3)} earned</span>
-        )}
-      </div>
 
-      {/* Analyst Agent - Bottom Right */}
-      <div
-        className={`agent-node ${derivedStates.analyst !== 'idle' ? 'active' : ''}`}
-        style={{ bottom: '60px', right: '60px', color: '#22d3ee' }}
-      >
-        {pulsingAgent === 'analyst' && <div className="pulse-ring" />}
-        <div className={`agent-avatar bg-cyan-500/20 border-2 border-cyan-500 ${derivedStates.analyst === 'proving' ? 'proving' : ''} ${derivedStates.analyst === 'working' ? 'working' : ''}`}>
-          <div className="flex flex-col items-center">
-            <AgentFace
-              expression={derivedStates.analyst === 'working' ? 'focused' : derivedStates.analyst === 'proving' ? 'thinking' : 'neutral'}
-              eyeDirection={getEyeDirection('analyst')}
-              color="#22d3ee"
-            />
-            <span className="text-2xl mt-1">🔬</span>
+        {/* Analyst Agent - Bottom Right */}
+        <div
+          className={`absolute flex flex-col items-center ${derivedStates.analyst !== 'idle' ? 'active' : ''}`}
+          style={{
+            left: positions.analyst.x,
+            top: positions.analyst.y,
+            transform: 'translate(-50%, -50%)',
+            color: '#22d3ee'
+          }}
+        >
+          {pulsingAgent === 'analyst' && <div className="pulse-ring" style={{ width: 80, height: 80 }} />}
+          <div className={`w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center ${derivedStates.analyst === 'proving' ? 'proving' : ''} ${derivedStates.analyst === 'working' ? 'working' : ''}`}>
+            <div className="flex flex-col items-center">
+              <AgentFace
+                expression={derivedStates.analyst === 'working' ? 'focused' : derivedStates.analyst === 'proving' ? 'thinking' : 'neutral'}
+                eyeDirection={getEyeDirection('analyst')}
+                color="#22d3ee"
+              />
+              <span className="text-lg">🔬</span>
+            </div>
           </div>
+          <span className="mt-1 text-sm font-semibold text-cyan-400">Analyst</span>
+          <span className="text-xs text-gray-500">Detective</span>
+          {stats && (
+            <span className="text-xs text-cyan-300">${stats.analystPaid.toFixed(3)}</span>
+          )}
         </div>
-        <span className="mt-2 font-semibold text-cyan-400">Analyst</span>
-        <span className="text-xs text-gray-500">Detective</span>
-        {derivedStates.analyst === 'working' && (
-          <span className="text-xs text-yellow-400 mt-1 animate-pulse">Classifying...</span>
-        )}
-        {derivedStates.analyst === 'proving' && (
-          <span className="text-xs text-cyan-400 mt-1 animate-pulse">Generating proof...</span>
-        )}
-        {stats && (
-          <span className="text-xs text-cyan-300 mt-1">${stats.analystPaid.toFixed(3)} earned</span>
-        )}
-      </div>
 
-      {/* Treasury - Center Bottom */}
-      <div className="treasury-node flex flex-col items-center" style={{ bottom: '10px' }}>
-        <div className="w-12 h-12 rounded-full bg-yellow-500/20 border-2 border-yellow-500 flex items-center justify-center">
-          <DollarSign className="text-yellow-400" size={24} />
+        {/* Treasury - Center Bottom */}
+        <div
+          className="absolute flex flex-col items-center"
+          style={{
+            left: positions.treasury.x,
+            top: positions.treasury.y,
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          <div className="w-10 h-10 rounded-full bg-yellow-500/20 border-2 border-yellow-500 flex items-center justify-center">
+            <DollarSign className="text-yellow-400" size={20} />
+          </div>
+          <span className="text-xs text-yellow-400 mt-1">Treasury</span>
         </div>
-        <span className="text-xs text-yellow-400 mt-1">Treasury</span>
-      </div>
 
-      {/* Legend */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-1 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-400" />
-          <span className="text-gray-500">Data</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-purple-400" />
-          <span className="text-gray-500">Payment</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-cyan-400" />
-          <span className="text-gray-500">Proof</span>
+        {/* Legend */}
+        <div className="absolute bottom-3 right-3 flex gap-4 text-xs">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-yellow-400" />
+            <span className="text-gray-500">Data</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-purple-400" />
+            <span className="text-gray-500">Payment</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-cyan-400" />
+            <span className="text-gray-500">Proof</span>
+          </div>
         </div>
       </div>
     </div>
