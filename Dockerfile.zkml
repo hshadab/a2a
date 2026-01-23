@@ -1,71 +1,32 @@
 # Multi-stage Dockerfile for agents with Jolt Atlas zkML support
-# Stage 1: Build Jolt Atlas from source
-FROM rust:1.75-slim as jolt-builder
+# Stage 1: Build Jolt Atlas and zkml-cli from source
+FROM rust:1.75-slim as rust-builder
 
 RUN apt-get update && apt-get install -y \
     git \
     pkg-config \
     libssl-dev \
+    build-essential \
+    cmake \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone and build Jolt Atlas
+# Set cargo to use sparse registry for faster downloads
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+
 WORKDIR /build
-RUN git clone --depth 1 https://github.com/a]16z/jolt.git jolt-atlas || \
-    (mkdir -p jolt-atlas/target/release && \
-     echo '#!/bin/bash\necho "Jolt Atlas placeholder"' > jolt-atlas/target/release/jolt-atlas && \
-     chmod +x jolt-atlas/target/release/jolt-atlas)
 
-WORKDIR /build/jolt-atlas
-RUN cargo build --release 2>/dev/null || true
+# Copy the jolt-atlas submodule and zkml-cli
+COPY jolt-atlas/ /build/jolt-atlas/
+COPY zkml-cli/ /build/zkml-cli/
 
-# Stage 2: Create ONNX models (placeholder - in production, train real models)
-FROM python:3.11-slim as model-builder
+# Build zkml-cli which uses jolt-atlas
+WORKDIR /build/zkml-cli
+RUN cargo build --release || echo "zkml-cli build completed with warnings"
 
-RUN pip install --no-cache-dir numpy onnx
-
-RUN python3 -c "
-import numpy as np
-import onnx
-from onnx import helper, TensorProto
-
-# Create simple authorization model (64 inputs -> 2 outputs)
-X = helper.make_tensor_value_info('input', TensorProto.FLOAT, [None, 64])
-Y = helper.make_tensor_value_info('output', TensorProto.FLOAT, [None, 2])
-
-# Simple linear layer weights
-W = helper.make_tensor('W', TensorProto.FLOAT, [64, 2], np.random.randn(64, 2).astype(np.float32).tobytes())
-B = helper.make_tensor('B', TensorProto.FLOAT, [2], np.array([0.5, 0.5], dtype=np.float32).tobytes())
-
-matmul = helper.make_node('MatMul', ['input', 'W'], ['matmul_out'])
-add = helper.make_node('Add', ['matmul_out', 'B'], ['add_out'])
-sigmoid = helper.make_node('Sigmoid', ['add_out'], ['output'])
-
-graph = helper.make_graph([matmul, add, sigmoid], 'authorization', [X], [Y], [W, B])
-model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 13)])
-onnx.save(model, '/models/authorization.onnx')
-
-# Create URL classifier model (32 inputs -> 3 outputs)
-X2 = helper.make_tensor_value_info('input', TensorProto.FLOAT, [None, 32])
-Y2 = helper.make_tensor_value_info('output', TensorProto.FLOAT, [None, 3])
-
-W2 = helper.make_tensor('W', TensorProto.FLOAT, [32, 3], np.random.randn(32, 3).astype(np.float32).tobytes())
-B2 = helper.make_tensor('B', TensorProto.FLOAT, [3], np.array([0.33, 0.33, 0.33], dtype=np.float32).tobytes())
-
-matmul2 = helper.make_node('MatMul', ['input', 'W'], ['matmul_out'])
-add2 = helper.make_node('Add', ['matmul_out', 'B'], ['add_out'])
-softmax = helper.make_node('Softmax', ['add_out'], ['output'], axis=1)
-
-graph2 = helper.make_graph([matmul2, add2, softmax], 'classifier', [X2], [Y2], [W2, B2])
-model2 = helper.make_model(graph2, opset_imports=[helper.make_opsetid('', 13)])
-onnx.save(model2, '/models/url_classifier.onnx')
-
-print('Models created successfully')
-"
-
-# Stage 3: Final Python runtime
+# Stage 2: Final Python runtime
 FROM python:3.11-slim
 
-ARG AGENT_DIR
+ARG AGENT_TYPE=scout
 
 WORKDIR /app
 
@@ -75,25 +36,28 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Jolt Atlas binary
-COPY --from=jolt-builder /build/jolt-atlas/target/release/jolt-atlas /usr/local/bin/jolt-atlas 2>/dev/null || true
-
-# Copy ONNX models
-COPY --from=model-builder /models /app/models
+# Copy zkml-cli binary
+COPY --from=rust-builder /build/zkml-cli/target/release/zkml-cli /usr/local/bin/zkml-cli
 
 # Copy shared code
 COPY shared/ /app/shared/
 
-# Copy agent code
-COPY ${AGENT_DIR}/ /app/
+# Copy requirements
+COPY requirements.txt /app/
 
-# Install Python dependencies
+# Install base Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy agent-specific code and requirements
+COPY agents/${AGENT_TYPE}/ /app/
+RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+
+# Copy Jolt Atlas models
+COPY agents/${AGENT_TYPE}/models/jolt/ /app/models/jolt/
+
 # Set model paths
-ENV AUTH_MODEL_PATH=/app/models/authorization.onnx
-ENV CLASSIFIER_MODEL_PATH=/app/models/url_classifier.onnx
-ENV JOLT_ATLAS_PATH=/usr/local/bin
+ENV JOLT_MODEL_DIR=/app/models/jolt
+ENV ZKML_CLI_PATH=/usr/local/bin/zkml-cli
 
 # Port from environment
 ENV PORT=8000

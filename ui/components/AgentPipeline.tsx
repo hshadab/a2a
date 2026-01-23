@@ -2,8 +2,36 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Activity, Shield, Zap, DollarSign, ArrowRight } from 'lucide-react';
+import ProofCard from './ProofCard';
+import VerificationChecklist from './VerificationChecklist';
 
 type AgentState = 'idle' | 'active' | 'working' | 'proving';
+
+interface ProofStage {
+  name: string;
+  message: string;
+  progress_pct: number;
+}
+
+interface ProofData {
+  proof_hash: string;
+  model_commitment: string;
+  input_commitment: string;
+  output_commitment: string;
+  prove_time_ms: number;
+  proof_size_bytes: number;
+  decision?: string;
+  confidence?: number;
+  is_real_proof?: boolean;
+  stages?: ProofStage[];
+}
+
+interface VerificationCheck {
+  name: string;
+  description: string;
+  status: 'pending' | 'checking' | 'passed' | 'failed';
+  detail?: string;
+}
 
 interface AgentEvent {
   type: string;
@@ -27,6 +55,85 @@ interface AgentPipelineProps {
 
 export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelineProps) {
   const [particles, setParticles] = useState<{ id: number; from: string; to: string }[]>([]);
+
+  // Track proof state for each agent
+  const [policyProof, setPolicyProof] = useState<ProofData | null>(null);
+  const [analystProof, setAnalystProof] = useState<ProofData | null>(null);
+  const [policyProofStage, setPolicyProofStage] = useState<ProofStage | null>(null);
+  const [analystProofStage, setAnalystProofStage] = useState<ProofStage | null>(null);
+  const [policyVerifyChecks, setPolicyVerifyChecks] = useState<VerificationCheck[]>([]);
+  const [analystVerifyChecks, setAnalystVerifyChecks] = useState<VerificationCheck[]>([]);
+
+  // Update proof state based on events
+  useEffect(() => {
+    if (!lastEvent) return;
+
+    switch (lastEvent.type) {
+      case 'POLICY_PROVING':
+        setPolicyProofStage({
+          name: lastEvent.data.stage || 'PROVING',
+          message: lastEvent.data.message || 'Generating zkML proof...',
+          progress_pct: lastEvent.data.progress_pct || 50,
+        });
+        break;
+
+      case 'POLICY_RESPONSE':
+        setPolicyProofStage(null);
+        if (lastEvent.data.proof) {
+          setPolicyProof({
+            proof_hash: lastEvent.data.proof.proof_hash || '',
+            model_commitment: lastEvent.data.proof.model_commitment || '',
+            input_commitment: lastEvent.data.proof.input_commitment || '',
+            output_commitment: lastEvent.data.proof.output_commitment || '',
+            prove_time_ms: lastEvent.data.proof.prove_time_ms || 0,
+            proof_size_bytes: lastEvent.data.proof.proof_size_bytes || 0,
+            decision: lastEvent.data.decision,
+            confidence: lastEvent.data.confidence,
+            is_real_proof: lastEvent.data.proof.is_real_proof || false,
+            stages: lastEvent.data.proof.stages,
+          });
+        }
+        break;
+
+      case 'POLICY_VERIFIED':
+        if (lastEvent.data.checks) {
+          setPolicyVerifyChecks(lastEvent.data.checks);
+        }
+        break;
+
+      case 'ANALYST_PROVING':
+        setAnalystProofStage({
+          name: lastEvent.data.stage || 'PROVING',
+          message: lastEvent.data.message || 'Generating zkML proof...',
+          progress_pct: lastEvent.data.progress_pct || 50,
+        });
+        break;
+
+      case 'ANALYST_RESPONSE':
+        setAnalystProofStage(null);
+        if (lastEvent.data.proof) {
+          setAnalystProof({
+            proof_hash: lastEvent.data.proof.proof_hash || '',
+            model_commitment: lastEvent.data.proof.model_commitment || '',
+            input_commitment: lastEvent.data.proof.input_commitment || '',
+            output_commitment: lastEvent.data.proof.output_commitment || '',
+            prove_time_ms: lastEvent.data.proof.prove_time_ms || 0,
+            proof_size_bytes: lastEvent.data.proof.proof_size_bytes || 0,
+            decision: lastEvent.data.classification,
+            confidence: lastEvent.data.confidence,
+            is_real_proof: lastEvent.data.proof.is_real_proof || false,
+            stages: lastEvent.data.proof.stages,
+          });
+        }
+        break;
+
+      case 'WORK_VERIFIED':
+        if (lastEvent.data.checks) {
+          setAnalystVerifyChecks(lastEvent.data.checks);
+        }
+        break;
+    }
+  }, [lastEvent]);
 
   // Derive agent states from last event
   const agentStates = useMemo(() => {
@@ -231,6 +338,47 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           <span>Payment</span>
         </div>
       </div>
+
+      {/* Proof Details Section */}
+      {(policyProof || analystProof || agentStates.policy === 'proving' || agentStates.analyst === 'proving') && (
+        <div className="mt-6 grid grid-cols-2 gap-4">
+          {/* Policy Proof Card */}
+          <div className="space-y-3">
+            <ProofCard
+              title="Authorization Proof"
+              proof={policyProof}
+              isGenerating={agentStates.policy === 'proving'}
+              currentStage={policyProofStage}
+              color="purple"
+              colorHex="#a855f7"
+            />
+            {policyVerifyChecks.length > 0 && (
+              <VerificationChecklist
+                checks={policyVerifyChecks}
+                verifyTimeMs={lastEvent?.type === 'POLICY_VERIFIED' ? lastEvent.data.verify_time_ms : undefined}
+              />
+            )}
+          </div>
+
+          {/* Analyst Proof Card */}
+          <div className="space-y-3">
+            <ProofCard
+              title="Classification Proof"
+              proof={analystProof}
+              isGenerating={agentStates.analyst === 'proving'}
+              currentStage={analystProofStage}
+              color="cyan"
+              colorHex="#22d3ee"
+            />
+            {analystVerifyChecks.length > 0 && (
+              <VerificationChecklist
+                checks={analystVerifyChecks}
+                verifyTimeMs={lastEvent?.type === 'WORK_VERIFIED' ? lastEvent.data.verify_time_ms : undefined}
+              />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
