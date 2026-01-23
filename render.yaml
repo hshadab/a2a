@@ -5,17 +5,15 @@ services:
   # Scout Agent - URL Discovery & Orchestration
   - type: web
     name: threat-intel-scout
-    runtime: python
+    runtime: docker
     region: oregon
-    plan: starter
-    buildCommand: |
-      pip install -r requirements.txt
-      pip install -r agents/scout/requirements.txt
-    startCommand: |
-      cd agents/scout && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: standard  # Need more resources for Rust build
+    dockerfilePath: ./Dockerfile.zkml
+    dockerContext: .
+    dockerCommand: ""
     envVars:
-      - key: PYTHONPATH
-        value: /opt/render/project/src
+      - key: AGENT_TYPE
+        value: scout
       - key: DATABASE_URL
         fromDatabase:
           name: threat-intel-db
@@ -38,17 +36,15 @@ services:
   # Policy Agent - Authorization with zkML Proofs
   - type: web
     name: threat-intel-policy
-    runtime: python
+    runtime: docker
     region: oregon
-    plan: starter
-    buildCommand: |
-      pip install -r requirements.txt
-      pip install -r agents/policy/requirements.txt
-    startCommand: |
-      cd agents/policy && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: standard  # Need more resources for zkML proofs
+    dockerfilePath: ./Dockerfile.zkml
+    dockerContext: .
+    dockerCommand: ""
     envVars:
-      - key: PYTHONPATH
-        value: /opt/render/project/src
+      - key: AGENT_TYPE
+        value: policy
       - key: DATABASE_URL
         fromDatabase:
           name: threat-intel-db
@@ -60,17 +56,15 @@ services:
   # Analyst Agent - URL Classification with zkML Proofs
   - type: web
     name: threat-intel-analyst
-    runtime: python
+    runtime: docker
     region: oregon
-    plan: starter
-    buildCommand: |
-      pip install -r requirements.txt
-      pip install -r agents/analyst/requirements.txt
-    startCommand: |
-      cd agents/analyst && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: standard  # Need more resources for zkML proofs
+    dockerfilePath: ./Dockerfile.zkml
+    dockerContext: .
+    dockerCommand: ""
     envVars:
-      - key: PYTHONPATH
-        value: /opt/render/project/src
+      - key: AGENT_TYPE
+        value: analyst
       - key: DATABASE_URL
         fromDatabase:
           name: threat-intel-db
