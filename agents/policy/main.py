@@ -244,9 +244,16 @@ async def agent_card():
 
 @app.get("/health")
 async def health():
+    import os
+    zkml_path = os.environ.get('ZKML_CLI_PATH', 'zkml-cli')
+    zkml_exists = os.path.isfile(zkml_path) if zkml_path.startswith('/') else False
     return {
         "status": "healthy",
-        "model_commitment": policy_agent.model_commitment
+        "model_commitment": policy_agent.model_commitment,
+        "zkml_cli_path": zkml_path,
+        "zkml_binary_exists": zkml_exists,
+        "zkml_available": authorization_prover.prover.zkml_available,
+        "jolt_model_dir": os.environ.get('JOLT_MODEL_DIR', 'not set')
     }
 
 
