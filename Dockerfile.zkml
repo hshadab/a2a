@@ -15,8 +15,10 @@ ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
 WORKDIR /build
 
-# Copy the jolt-atlas submodule and zkml-cli
-COPY jolt-atlas/ /build/jolt-atlas/
+# Clone jolt-atlas directly (Render doesn't fetch submodules)
+RUN git clone --depth 1 https://github.com/ICME-Lab/jolt-atlas.git /build/jolt-atlas
+
+# Copy the zkml-cli wrapper
 COPY zkml-cli/ /build/zkml-cli/
 
 # Build zkml-cli which uses jolt-atlas
