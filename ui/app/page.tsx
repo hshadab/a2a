@@ -17,15 +17,13 @@ import {
 import {
   Activity,
   Shield,
-  Zap,
   Database,
   DollarSign,
   AlertTriangle,
   CheckCircle,
-  Clock,
   RefreshCw,
 } from 'lucide-react';
-import AgentTriangle from '@/components/AgentTriangle';
+import AgentPipeline from '@/components/AgentPipeline';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 
@@ -123,54 +121,12 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Agent Triangle Visualization */}
+      {/* Agent Pipeline Visualization */}
       <section className="mb-8">
-        <AgentTriangle
-          scoutState={health?.running ? 'active' : 'idle'}
-          policyState={lastEvent?.type.includes('POLICY') ? (lastEvent?.type === 'POLICY_PROVING' ? 'proving' : 'working') : 'active'}
-          analystState={lastEvent?.type.includes('ANALYST') ? (lastEvent?.type === 'ANALYST_PROVING' ? 'proving' : 'working') : 'active'}
+        <AgentPipeline
+          events={events}
           lastEvent={lastEvent}
-          stats={stats ? {
-            policyPaid: stats.policy_paid_usdc,
-            analystPaid: stats.analyst_paid_usdc,
-            totalUrls: stats.total_urls,
-          } : undefined}
-        />
-      </section>
-
-      {/* Agent Details */}
-      <section className="grid grid-cols-3 gap-4 mb-8">
-        <AgentCard
-          name="Scout"
-          status={health?.running ? 'active' : 'idle'}
-          icon={<Activity className="text-blue-400" />}
-          stats={[
-            { label: 'Sources', value: '5' },
-            { label: 'URLs/batch', value: '50' },
-          ]}
-          color="blue"
-        />
-        <AgentCard
-          name="Policy"
-          status={lastEvent?.type.includes('POLICY') ? 'working' : 'active'}
-          icon={<Shield className="text-purple-400" />}
-          stats={[
-            { label: 'Model', value: 'authz.onnx' },
-            { label: 'Price', value: '$0.001' },
-          ]}
-          color="purple"
-          isProving={lastEvent?.type === 'POLICY_PROVING'}
-        />
-        <AgentCard
-          name="Analyst"
-          status={lastEvent?.type.includes('ANALYST') ? 'working' : 'active'}
-          icon={<Zap className="text-cyan-400" />}
-          stats={[
-            { label: 'Model', value: 'classify.onnx' },
-            { label: 'Price', value: '$0.0005/URL' },
-          ]}
-          color="cyan"
-          isProving={lastEvent?.type === 'ANALYST_PROVING'}
+          stats={stats}
         />
       </section>
 
@@ -296,62 +252,6 @@ export default function Dashboard() {
 }
 
 // ============ Components ============
-
-function AgentCard({
-  name,
-  status,
-  icon,
-  stats,
-  color,
-  isProving,
-}: {
-  name: string;
-  status: 'idle' | 'active' | 'working';
-  icon: React.ReactNode;
-  stats: { label: string; value: string }[];
-  color: string;
-  isProving?: boolean;
-}) {
-  const statusColors = {
-    idle: 'bg-gray-500',
-    active: 'bg-green-500',
-    working: 'bg-yellow-500 animate-pulse',
-  };
-
-  return (
-    <div className={`card p-4 border-${color}-500/30`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {icon}
-          <span className="font-semibold">{name}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${statusColors[status]}`} />
-          <span className="text-sm text-gray-400 capitalize">{status}</span>
-        </div>
-      </div>
-      {isProving && (
-        <div className="mb-3">
-          <div className="flex items-center gap-2 text-sm text-yellow-400 mb-1">
-            <Shield size={14} />
-            Generating zkML proof...
-          </div>
-          <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-            <div className="h-full bg-yellow-400 animate-pulse w-2/3" />
-          </div>
-        </div>
-      )}
-      <div className="space-y-1">
-        {stats.map((stat) => (
-          <div key={stat.label} className="flex justify-between text-sm">
-            <span className="text-gray-500">{stat.label}</span>
-            <span className="text-gray-300">{stat.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function StatCard({
   label,

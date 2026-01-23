@@ -311,3 +311,56 @@ body {
 .proving {
   animation: proofGlow 0.5s ease-in-out infinite;
 }
+
+/* Pipeline Flow Animations */
+@keyframes flowParticleHorizontal {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 8px);
+    opacity: 0;
+  }
+}
+
+.animate-flow-particle {
+  animation: flowParticleHorizontal 1.5s ease-in-out forwards;
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 8s linear infinite;
+}
+
+/* Agent Card Glow States */
+.agent-card-proving {
+  animation: proofGlow 0.5s ease-in-out infinite;
+}
+
+.agent-card-working {
+  animation: workingPulse 2s ease-in-out infinite;
+}
+
+@keyframes workingPulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.1);
+  }
+}
