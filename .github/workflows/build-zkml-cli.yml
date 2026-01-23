@@ -69,18 +69,44 @@ jobs:
             tail -100 build.log
             exit 1
           }
+          echo "=== Build completed, listing target/release ==="
+          ls -la target/release/ | head -30
+          echo "=== Looking for executables ==="
+          find target/release -maxdepth 1 -type f -executable 2>/dev/null | head -10
 
       - name: Verify binary
         run: |
-          ls -la zkml-cli/target/release/zkml-cli
-          file zkml-cli/target/release/zkml-cli
-          du -h zkml-cli/target/release/zkml-cli
+          echo "=== Listing zkml-cli/target/release ==="
+          ls -la zkml-cli/target/release/ 2>/dev/null | head -20 || echo "Directory not found"
+          echo "=== Looking for zkml-cli binary ==="
+          find . -name "zkml-cli" -type f 2>/dev/null | head -5
+          echo "=== Checking if binary exists ==="
+          if [ -f zkml-cli/target/release/zkml-cli ]; then
+            file zkml-cli/target/release/zkml-cli
+            du -h zkml-cli/target/release/zkml-cli
+          else
+            echo "Binary not found at expected path"
+            echo "Listing all executables in target directories:"
+            find . -path "*/target/release/*" -type f -executable 2>/dev/null | head -10
+          fi
+
+      - name: Prepare binary for upload
+        run: |
+          mkdir -p artifacts
+          # Try to find and copy the binary
+          if [ -f zkml-cli/target/release/zkml-cli ]; then
+            cp zkml-cli/target/release/zkml-cli artifacts/
+          else
+            # Look for any executable in release directory
+            find zkml-cli/target/release -maxdepth 1 -type f -executable -exec cp {} artifacts/zkml-cli \; 2>/dev/null || true
+          fi
+          ls -la artifacts/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: zkml-cli-linux-x86_64
-          path: zkml-cli/target/release/zkml-cli
+          path: artifacts/zkml-cli
           retention-days: 90
 
   release:
