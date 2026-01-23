@@ -77,17 +77,19 @@ jobs:
       - name: Verify binary
         run: |
           echo "=== Listing zkml-cli/target/release ==="
-          ls -la zkml-cli/target/release/ 2>/dev/null | head -20 || echo "Directory not found"
+          ls -la zkml-cli/target/release/ 2>/dev/null | grep -v '\.d$' | head -20 || echo "Directory not found"
           echo "=== Looking for zkml-cli binary ==="
           find . -name "zkml-cli" -type f 2>/dev/null | head -5
           echo "=== Checking if binary exists ==="
           if [ -f zkml-cli/target/release/zkml-cli ]; then
+            echo "Binary found!"
             file zkml-cli/target/release/zkml-cli
             du -h zkml-cli/target/release/zkml-cli
           else
-            echo "Binary not found at expected path"
-            echo "Listing all executables in target directories:"
-            find . -path "*/target/release/*" -type f -executable 2>/dev/null | head -10
+            echo "ERROR: Binary not found at zkml-cli/target/release/zkml-cli"
+            echo "Listing all files in target/release:"
+            ls -la zkml-cli/target/release/ 2>/dev/null || echo "Directory doesn't exist"
+            exit 1
           fi
 
       - name: Prepare binary for upload
