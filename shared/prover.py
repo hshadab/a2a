@@ -2,6 +2,7 @@
 Jolt Atlas zkML Prover Wrapper
 
 Provides Python interface to Jolt Atlas for proof generation and verification.
+Supports both real ONNX inference and simulated mode for development.
 """
 import subprocess
 import json
@@ -12,7 +13,18 @@ import os
 from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass
 
+import numpy as np
+
 from .config import config
+from .logging_config import prover_logger as logger
+
+# Try to import ONNX runtime for real inference
+try:
+    import onnxruntime as ort
+    ONNX_AVAILABLE = True
+except ImportError:
+    ONNX_AVAILABLE = False
+    logger.warning("onnxruntime not available, using simulated inference")
 
 
 @dataclass
@@ -231,13 +243,53 @@ class JoltAtlasProver:
                 if os.path.exists(f):
                     os.remove(f)
 
+    def _run_onnx_inference(self, model_path: str, inputs: List[float]) -> Optional[np.ndarray]:
+        """Run real ONNX inference if available"""
+        if not ONNX_AVAILABLE or not os.path.exists(model_path):
+            return None
+
+        try:
+            session = ort.InferenceSession(model_path)
+            input_name = session.get_inputs()[0].name
+            input_shape = session.get_inputs()[0].shape
+
+            # Reshape inputs to match model expectations
+            expected_size = input_shape[1] if len(input_shape) > 1 else len(inputs)
+            if len(inputs) < expected_size:
+                inputs = inputs + [0.0] * (expected_size - len(inputs))
+            elif len(inputs) > expected_size:
+                inputs = inputs[:expected_size]
+
+            input_array = np.array([inputs], dtype=np.float32)
+            outputs = session.run(None, {input_name: input_array})
+            logger.debug(f"ONNX inference completed for {model_path}")
+            return outputs[0]
+        except Exception as e:
+            logger.warning(f"ONNX inference failed: {e}, falling back to simulation")
+            return None
+
     def _simulate_inference(self, model_name: str, inputs: List[float]) -> Dict[str, Any]:
-        """Simulate model inference for development"""
+        """Run model inference - uses real ONNX when available, otherwise simulates"""
+
+        # Try real ONNX inference first
         if "authorization" in model_name.lower():
-            # Authorization model: binary classification
-            # For demo, approve most requests (check cost ratio isn't too high)
-            cost_ratio = inputs[7] if len(inputs) > 7 else 0.1  # Cost/budget ratio
-            # Approve if cost is less than 50% of budget
+            model_path = config.authorization_model_path
+            outputs = self._run_onnx_inference(model_path, inputs)
+
+            if outputs is not None:
+                # Real ONNX output: [deny_score, approve_score]
+                scores = outputs[0]
+                decision = "AUTHORIZED" if scores[1] > scores[0] else "DENIED"
+                confidence = float(max(scores))
+                logger.info(f"Real ONNX authorization: {decision} (confidence: {confidence:.2f})")
+                return {
+                    "decision": decision,
+                    "confidence": confidence,
+                    "scores": scores.tolist()
+                }
+
+            # Fallback: simulated authorization
+            cost_ratio = inputs[7] if len(inputs) > 7 else 0.1
             decision = "AUTHORIZED" if cost_ratio < 0.5 else "DENIED"
             confidence = min(0.99, max(0.7, 0.9 - cost_ratio))
             return {
@@ -246,8 +298,25 @@ class JoltAtlasProver:
                 "scores": [1 - confidence, confidence]
             }
         else:
-            # URL classifier: 3-class classification
-            # Simple heuristic
+            # URL classifier
+            model_path = config.classifier_model_path
+            outputs = self._run_onnx_inference(model_path, inputs)
+
+            if outputs is not None:
+                # Real ONNX output: [phishing_score, safe_score, suspicious_score]
+                scores = outputs[0]
+                class_idx = int(np.argmax(scores))
+                classifications = ["PHISHING", "SAFE", "SUSPICIOUS"]
+                classification = classifications[class_idx]
+                confidence = float(scores[class_idx])
+                logger.info(f"Real ONNX classification: {classification} (confidence: {confidence:.2f})")
+                return {
+                    "classification": classification,
+                    "confidence": confidence,
+                    "scores": scores.tolist()
+                }
+
+            # Fallback: simulated classification
             risk_score = sum(inputs[:10]) / 10 if len(inputs) >= 10 else 0.5
 
             if risk_score > 0.7:
