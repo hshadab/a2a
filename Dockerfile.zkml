@@ -1,6 +1,5 @@
 # Dockerfile for agents with zkML support
-# Note: Real Jolt Atlas proofs require building zkml-cli separately
-# This Dockerfile provides the Python runtime with simulated proof fallback
+# Note: Uses simulated proofs (zkml-cli requires separate build)
 
 FROM python:3.11-slim
 
@@ -15,38 +14,32 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy shared code
+# Copy shared code first
 COPY shared/ /app/shared/
 
-# Copy requirements
+# Copy base requirements and install
 COPY requirements.txt /app/
-
-# Install base Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy agent-specific code and requirements
-COPY agents/${AGENT_TYPE}/ /app/
+# Copy agent-specific code
+COPY agents/${AGENT_TYPE}/ /app/agent/
 
-# Install agent-specific dependencies
+# Install agent-specific dependencies if they exist
+WORKDIR /app/agent
 RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 
-# Create models directory for jolt models (optional)
-RUN mkdir -p /app/models/jolt
-
-# Copy Jolt Atlas models if they exist
-COPY agents/${AGENT_TYPE}/models/ /app/models/ 2>/dev/null || true
-
-# Set model paths
-ENV JOLT_MODEL_DIR=/app/models/jolt
+# Set environment
+ENV JOLT_MODEL_DIR=/app/agent/models/jolt
 ENV ZKML_CLI_PATH=/usr/local/bin/zkml-cli
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/agent
 
-# Port from environment
+# Port from environment (Render sets PORT)
 ENV PORT=8000
+EXPOSE ${PORT}
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Run the agent
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the agent - use shell form to expand PORT
+CMD python -m uvicorn main:app --host 0.0.0.0 --port ${PORT}
