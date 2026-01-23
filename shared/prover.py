@@ -11,6 +11,7 @@ import time
 import tempfile
 import os
 import asyncio
+import shutil
 from typing import Dict, Any, List, Tuple, Optional, Callable
 from dataclasses import dataclass, field
 
@@ -92,19 +93,20 @@ class JoltAtlasProver:
         self.progress_callback: Optional[Callable[[ProofStage], None]] = None
 
     def _check_zkml_cli(self) -> bool:
-        """Check if zkml-cli binary is available"""
+        """Check if proof_json_output binary is available"""
         try:
-            result = subprocess.run(
-                [self.zkml_cli_path, '--help'],
-                capture_output=True,
-                timeout=5
-            )
-            available = result.returncode == 0
-            if available:
-                logger.info("zkml-cli binary found - using real Jolt Atlas proofs")
-            return available
-        except (subprocess.SubprocessError, FileNotFoundError):
-            logger.warning("zkml-cli not found - using simulated proofs")
+            # proof_json_output binary doesn't have --help, check if it exists and is executable
+            if os.path.isfile(self.zkml_cli_path) and os.access(self.zkml_cli_path, os.X_OK):
+                logger.info(f"Jolt Atlas prover found at {self.zkml_cli_path} - using REAL zkML proofs")
+                return True
+            # Also check if it's in PATH
+            if shutil.which(self.zkml_cli_path):
+                logger.info(f"Jolt Atlas prover found in PATH - using REAL zkML proofs")
+                return True
+            logger.warning(f"Jolt Atlas prover not found at {self.zkml_cli_path} - using simulated proofs")
+            return False
+        except Exception as e:
+            logger.warning(f"Error checking for Jolt Atlas prover: {e} - using simulated proofs")
             return False
 
     def get_model_commitment(self, model_path: str) -> str:
@@ -127,105 +129,171 @@ class JoltAtlasProver:
         logger.debug(f"Proof stage: {stage} ({pct}%) - {message}")
         return proof_stage
 
+    def _find_jolt_model(self, model_path: str, model_name: str) -> Optional[str]:
+        """
+        Find the Jolt-compatible ONNX model.
+
+        The Jolt models are stored in a 'jolt' subdirectory with network.onnx
+        """
+        model_dir = os.path.dirname(model_path)
+
+        # Try jolt subdirectory first
+        jolt_model = os.path.join(model_dir, 'jolt', 'network.onnx')
+        if os.path.exists(jolt_model):
+            return jolt_model
+
+        # Try JOLT_MODEL_DIR environment variable
+        if self.jolt_model_dir and os.path.exists(self.jolt_model_dir):
+            jolt_model = os.path.join(self.jolt_model_dir, 'network.onnx')
+            if os.path.exists(jolt_model):
+                return jolt_model
+
+        # Try model_path directly if it's an onnx file
+        if model_path.endswith('.onnx') and os.path.exists(model_path):
+            return model_path
+
+        return None
+
+    def _scale_inputs_to_integers(self, inputs: List[float], model_name: str) -> List[int]:
+        """
+        Scale float inputs to integers for the Jolt prover.
+
+        The Jolt prover works with fixed-point arithmetic, so we need to
+        scale floating point values to integers.
+        """
+        # Scale factor for fixed-point representation (2^16 for good precision)
+        SCALE = 65536
+
+        if "authorization" in model_name.lower():
+            # For authorization, inputs are already normalized 0-1
+            # Scale to integer range expected by the model
+            int_inputs = []
+            for i, val in enumerate(inputs[:64]):  # Authorization uses 64 features
+                # Clamp to 0-1 range and scale
+                clamped = max(0.0, min(1.0, val))
+                scaled = int(clamped * SCALE)
+                int_inputs.append(scaled)
+            # Pad to 64 if needed
+            while len(int_inputs) < 64:
+                int_inputs.append(0)
+            return int_inputs
+        else:
+            # For URL classifier, similar scaling
+            int_inputs = []
+            for val in inputs[:32]:  # Classifier uses 32 features
+                clamped = max(0.0, min(1.0, val))
+                scaled = int(clamped * SCALE)
+                int_inputs.append(scaled)
+            # Pad to 32 if needed
+            while len(int_inputs) < 32:
+                int_inputs.append(0)
+            return int_inputs
+
     async def generate_proof_real(
         self,
-        proof_type: str,  # 'auth' or 'classify'
-        input_data: Dict[str, Any],
-        model_dir: str
+        model_path: str,
+        inputs: List[int],
+        model_name: str = "model"
     ) -> ProofResult:
         """
-        Generate a REAL zkML proof using Jolt Atlas zkml-cli.
+        Generate a REAL zkML proof using Jolt Atlas proof_json_output binary.
+
+        The binary interface is: proof_json_output <model.onnx> <input1> <input2> ...
+        It outputs JSON with proof data to stdout.
         """
         stages: List[ProofStage] = []
         start_time = time.time()
 
         # Stage 1: Prepare input
-        stages.append(self._emit_progress("PREPARING", "Preparing input data...", 5))
+        stages.append(self._emit_progress("PREPARING", "Preparing model and inputs...", 5))
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(input_data, f)
-            input_file = f.name
+        # Build the command: proof_json_output <model_path> <inputs...>
+        cmd = [self.zkml_cli_path, model_path] + [str(int(i)) for i in inputs]
 
-        output_file = tempfile.mktemp(suffix='.json')
+        logger.info(f"Running Jolt Atlas prover: {' '.join(cmd[:3])}... ({len(inputs)} inputs)")
 
         try:
-            # Stage 2: Call zkml-cli
-            stages.append(self._emit_progress("PREPROCESSING", "Preprocessing model for proving...", 10))
+            # Stage 2: Run the prover
+            stages.append(self._emit_progress("PROVING", "Generating zkML proof (this may take a while)...", 20))
 
-            cmd = [
-                self.zkml_cli_path,
-                f'prove-{proof_type}',
-                '--input', input_file,
-                '--output', output_file,
-                '--model-dir', model_dir,
-                '--progress'
-            ]
-
-            # Run with streaming progress
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
 
-            # Read progress from stderr
-            async def read_progress():
-                while True:
-                    line = await process.stderr.readline()
-                    if not line:
-                        break
-                    try:
-                        event = json.loads(line.decode())
-                        stage = ProofStage(
-                            name=event.get('stage', 'UNKNOWN'),
-                            message=event.get('message', ''),
-                            progress_pct=event.get('progress_pct', 0)
-                        )
-                        stages.append(stage)
-                        if self.progress_callback:
-                            self.progress_callback(stage)
-                    except json.JSONDecodeError:
-                        logger.debug(f"zkml-cli: {line.decode().strip()}")
+            # Progress updates while waiting
+            stages.append(self._emit_progress("PROVING", "Computing polynomial commitments...", 40))
 
-            await read_progress()
-            await process.wait()
+            stdout, stderr = await process.communicate()
+
+            stages.append(self._emit_progress("PROVING", "Generating SNARK proof...", 70))
 
             if process.returncode != 0:
-                raise Exception(f"zkml-cli failed with code {process.returncode}")
+                error_msg = stderr.decode() if stderr else "Unknown error"
+                logger.error(f"Jolt Atlas prover failed: {error_msg}")
+                raise Exception(f"Jolt Atlas prover failed with code {process.returncode}: {error_msg}")
 
-            # Stage 3: Read output
-            stages.append(self._emit_progress("READING", "Reading proof output...", 90))
+            # Stage 3: Parse output
+            stages.append(self._emit_progress("PARSING", "Parsing proof output...", 90))
 
-            with open(output_file, 'r') as f:
-                result = json.load(f)
+            try:
+                result = json.loads(stdout.decode())
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse prover output: {stdout.decode()[:500]}")
+                raise Exception(f"Failed to parse prover output: {e}")
 
-            stages.append(self._emit_progress("COMPLETE", "Proof generation complete!", 100))
+            stages.append(self._emit_progress("COMPLETE", "REAL zkML proof generated!", 100))
 
             prove_time = int((time.time() - start_time) * 1000)
 
+            # Extract proof data from result
+            proof_hex = result.get('proof_hex', result.get('proof', ''))
+            if not proof_hex and 'proof_bytes' in result:
+                proof_hex = bytes(result['proof_bytes']).hex()
+
+            # Handle different output formats
+            proof_bytes = bytes.fromhex(proof_hex) if proof_hex else b''
+            proof_hash = result.get('proof_hash', hashlib.sha256(proof_bytes).hexdigest())
+
+            # Model commitment from result or compute
+            model_commitment = result.get('model_commitment', self.get_model_commitment(model_path))
+            input_commitment = result.get('input_commitment', compute_commitment(inputs))
+
+            # Extract decision/classification from output
+            output_data = result.get('output', {})
+            if 'decision' in result:
+                output_data['decision'] = result['decision']
+            if 'classification' in result:
+                output_data['classification'] = result['classification']
+            if 'confidence' in result:
+                output_data['confidence'] = result['confidence']
+            if 'scores' in result:
+                output_data['scores'] = result['scores']
+
+            output_commitment = result.get('output_commitment', compute_commitment(output_data))
+
+            proof_size = result.get('proof_size_bytes', len(proof_bytes))
+
+            logger.info(f"REAL zkML proof generated in {prove_time}ms, size: {proof_size} bytes")
+
             return ProofResult(
-                proof=bytes.fromhex(result['proof_hex']),
-                proof_hex=result['proof_hex'],
-                proof_hash=result['proof_hash'],
-                model_commitment=result['model_commitment'],
-                input_commitment=result['input_commitment'],
-                output_commitment=result['output_commitment'],
-                output={
-                    'decision': result['decision'],
-                    'confidence': result['confidence'],
-                    'scores': result['scores']
-                },
+                proof=proof_bytes,
+                proof_hex=proof_hex,
+                proof_hash=proof_hash,
+                model_commitment=model_commitment,
+                input_commitment=input_commitment,
+                output_commitment=output_commitment,
+                output=output_data,
                 prove_time_ms=prove_time,
-                proof_size_bytes=result['proof_size_bytes'],
+                proof_size_bytes=proof_size,
                 stages=stages,
                 is_real_proof=True
             )
 
-        finally:
-            # Cleanup
-            for f in [input_file, output_file]:
-                if os.path.exists(f):
-                    os.remove(f)
+        except Exception as e:
+            logger.error(f"Real proof generation failed: {e}")
+            raise
 
     async def generate_proof(
         self,
@@ -248,30 +316,22 @@ class JoltAtlasProver:
         # Try real proof generation if available
         if self.zkml_available:
             try:
-                if "authorization" in model_name.lower():
-                    # Convert inputs to authorization features
-                    auth_input = {
-                        'budget': int(inputs[0] * 15),
-                        'trust': int(inputs[3] * 7),
-                        'amount': int(inputs[2] * 14),
-                        'category': 0,
-                        'velocity': int(inputs[4] * 7),
-                        'day': 1,
-                        'time': 1,
-                        'risk': int(inputs[6] * 1)
-                    }
+                # Find the Jolt-compatible model (network.onnx in jolt subdirectory)
+                jolt_model_path = self._find_jolt_model(model_path, model_name)
+
+                if jolt_model_path and os.path.exists(jolt_model_path):
+                    # Convert float inputs to integers for the Jolt prover
+                    # The prover expects integer inputs (scaled features)
+                    int_inputs = self._scale_inputs_to_integers(inputs, model_name)
+
+                    logger.info(f"Using REAL Jolt Atlas prover with model: {jolt_model_path}")
                     return await self.generate_proof_real(
-                        'auth',
-                        auth_input,
-                        os.path.dirname(model_path)
+                        model_path=jolt_model_path,
+                        inputs=int_inputs,
+                        model_name=model_name
                     )
                 else:
-                    classify_input = {'features': inputs[:32]}
-                    return await self.generate_proof_real(
-                        'classify',
-                        classify_input,
-                        os.path.dirname(model_path)
-                    )
+                    logger.warning(f"Jolt model not found for {model_name}, falling back to simulation")
             except Exception as e:
                 logger.warning(f"Real proof generation failed, falling back to simulation: {e}")
 
