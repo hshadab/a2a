@@ -91,37 +91,24 @@ jobs:
           fi
 
       - name: Prepare binary for upload
+        working-directory: zkml-cli
         run: |
-          mkdir -p artifacts
-          echo "=== Looking for zkml-cli binary ==="
-          # Try the expected path first
-          if [ -f zkml-cli/target/release/zkml-cli ]; then
-            echo "Found at expected path"
-            cp zkml-cli/target/release/zkml-cli artifacts/zkml-cli
-          else
-            echo "Not at expected path, searching..."
-            # Find all executables and show them
-            echo "All executables in target/release:"
-            find . -path "*/target/release/*" -maxdepth 4 -type f -executable 2>/dev/null
-            # Try to find zkml-cli specifically
-            BINARY=$(find . -name "zkml-cli" -type f -executable 2>/dev/null | head -1)
-            if [ -n "$BINARY" ]; then
-              echo "Found binary at: $BINARY"
-              cp "$BINARY" artifacts/zkml-cli
-            else
-              echo "ERROR: Could not find zkml-cli binary anywhere!"
-              exit 1
-            fi
-          fi
+          mkdir -p ../artifacts
+          echo "=== Current directory ==="
+          pwd
+          echo "=== Looking for binary ==="
+          ls -la target/release/ | grep -v '\.d$' | head -20
+          echo "=== Copying binary ==="
+          cp target/release/zkml-cli ../artifacts/zkml-cli
           echo "=== Artifact ready ==="
-          ls -la artifacts/
-          file artifacts/zkml-cli
+          ls -la ../artifacts/
+          file ../artifacts/zkml-cli
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: zkml-cli-linux-x86_64
-          path: artifacts/zkml-cli
+          path: ./artifacts/zkml-cli
           retention-days: 90
           if-no-files-found: error
 
