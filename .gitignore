@@ -48,3 +48,5 @@ Thumbs.db
 
 # Keep ONNX models in repo for deployment
 # *.onnx
+zkml-cli/target/
+bin/
