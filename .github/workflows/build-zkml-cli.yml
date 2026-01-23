@@ -1,0 +1,93 @@
+name: Build zkml-cli Binary
+
+on:
+  push:
+    paths:
+      - 'zkml-cli/**'
+      - '.github/workflows/build-zkml-cli.yml'
+    branches:
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60  # Rust builds can take a while
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: 1.75.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            zkml-cli/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('zkml-cli/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev build-essential cmake
+
+      - name: Build zkml-cli
+        working-directory: zkml-cli
+        run: |
+          cargo build --release
+          ls -la target/release/zkml-cli
+
+      - name: Get binary info
+        run: |
+          file zkml-cli/target/release/zkml-cli
+          du -h zkml-cli/target/release/zkml-cli
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkml-cli-linux-x86_64
+          path: zkml-cli/target/release/zkml-cli
+          retention-days: 90
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zkml-cli-linux-x86_64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: zkml-cli-v1.0.0
+          name: zkml-cli Binary v1.0.0
+          body: |
+            Pre-built zkml-cli binary for Jolt Atlas zkML proofs.
+
+            - Platform: Linux x86_64
+            - Rust: 1.75.0
+            - Use with threat-intel-network agents
+
+            Download and place in `/usr/local/bin/zkml-cli`
+          files: zkml-cli
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
