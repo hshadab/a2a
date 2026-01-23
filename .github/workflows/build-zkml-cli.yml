@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'zkml-cli/**'
+      - 'jolt-atlas/**'
       - '.github/workflows/build-zkml-cli.yml'
     branches:
       - main
@@ -15,13 +16,18 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # Rust builds can take a while
+    timeout-minutes: 90  # Jolt Atlas builds can take a very long time
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+
+      - name: Initialize jolt-atlas submodule
+        run: |
+          git submodule update --init --recursive
+          ls -la jolt-atlas/
+          ls -la jolt-atlas/zkml-jolt-core/ || echo "zkml-jolt-core not found"
+          ls -la jolt-atlas/onnx-tracer/ || echo "onnx-tracer not found"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -34,24 +40,39 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
+            jolt-atlas/target
             zkml-cli/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('zkml-cli/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-zkml-${{ hashFiles('zkml-cli/Cargo.toml', 'jolt-atlas/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-zkml-
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev build-essential cmake
 
+      - name: Check Cargo.toml paths
+        run: |
+          echo "=== zkml-cli Cargo.toml ==="
+          cat zkml-cli/Cargo.toml
+          echo ""
+          echo "=== Checking path dependencies ==="
+          ls -la jolt-atlas/zkml-jolt-core/Cargo.toml || echo "Not found"
+          ls -la jolt-atlas/onnx-tracer/Cargo.toml || echo "Not found"
+
       - name: Build zkml-cli
         working-directory: zkml-cli
         run: |
-          cargo build --release
-          ls -la target/release/zkml-cli
+          echo "Starting Rust build..."
+          cargo build --release 2>&1 | tee build.log || {
+            echo "=== Build failed, showing last 100 lines of log ==="
+            tail -100 build.log
+            exit 1
+          }
 
-      - name: Get binary info
+      - name: Verify binary
         run: |
+          ls -la zkml-cli/target/release/zkml-cli
           file zkml-cli/target/release/zkml-cli
           du -h zkml-cli/target/release/zkml-cli
 
@@ -66,6 +87,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
 
     steps:
       - name: Download artifact

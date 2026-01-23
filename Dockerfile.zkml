@@ -1,5 +1,5 @@
 # Dockerfile for agents with zkML support
-# Downloads pre-built zkml-cli binary from GitHub Releases
+# Downloads pre-built zkml-cli binary from GitHub Releases when available
 
 FROM python:3.11-slim
 
@@ -12,19 +12,13 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Download pre-built zkml-cli binary from GitHub Releases
+# Try to download pre-built zkml-cli binary from GitHub Releases
 # Falls back gracefully if not available (uses simulated proofs)
-RUN curl -L -o /usr/local/bin/zkml-cli \
-    "https://github.com/hshadab/a2a/releases/download/zkml-cli-v1.0.0/zkml-cli" \
+RUN curl -fsSL -o /usr/local/bin/zkml-cli \
+    "https://github.com/hshadab/a2a/releases/download/zkml-cli-v1.0.0/zkml-cli" 2>/dev/null \
     && chmod +x /usr/local/bin/zkml-cli \
     && echo "zkml-cli downloaded successfully" \
-    || echo "zkml-cli not available, will use simulated proofs"
-
-# Verify binary (optional - don't fail if not present)
-RUN if [ -f /usr/local/bin/zkml-cli ]; then \
-    ls -la /usr/local/bin/zkml-cli && \
-    /usr/local/bin/zkml-cli --help 2>/dev/null || true; \
-    fi
+    || echo "zkml-cli not available yet, will use simulated proofs"
 
 # Create the directory structure matching the original repo
 WORKDIR /opt/render/project/src
