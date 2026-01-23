@@ -12,13 +12,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Try to download pre-built Jolt Atlas proof binary from zkx402 releases
-# Falls back gracefully if not available (uses simulated proofs)
-RUN curl -fsSL -o /usr/local/bin/proof_json_output \
-    "https://github.com/hshadab/zkx402/releases/download/jolt-binary-v1/proof_json_output" 2>/dev/null \
-    && chmod +x /usr/local/bin/proof_json_output \
-    && echo "Jolt Atlas prover downloaded successfully (143MB)" \
-    || echo "Prover not available, will use simulated proofs"
+# Download pre-built Jolt Atlas proof binary from zkx402 releases
+# This is a 143MB binary that generates REAL zkML proofs
+RUN echo "Downloading Jolt Atlas prover binary (143MB)..." && \
+    curl -fSL --retry 3 --retry-delay 5 -o /usr/local/bin/proof_json_output \
+    "https://github.com/hshadab/zkx402/releases/download/jolt-binary-v1/proof_json_output" && \
+    chmod +x /usr/local/bin/proof_json_output && \
+    ls -la /usr/local/bin/proof_json_output && \
+    echo "Jolt Atlas prover downloaded and verified!" || \
+    (echo "WARNING: Failed to download prover, will use simulated proofs" && rm -f /usr/local/bin/proof_json_output)
 
 # Create the directory structure matching the original repo
 WORKDIR /opt/render/project/src
