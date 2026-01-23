@@ -257,11 +257,18 @@ class Database:
             return
 
         try:
+            # Handle SSL for Render PostgreSQL
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
             self._pool = await asyncpg.create_pool(
                 self.database_url,
                 min_size=2,
                 max_size=10,
-                timeout=5
+                timeout=30,
+                ssl=ssl_context
             )
             logger.info("Connected to PostgreSQL")
         except Exception as e:
