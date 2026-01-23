@@ -25,17 +25,20 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY agents/${AGENT_TYPE}/ /app/agent/
 
 # Install agent-specific dependencies if they exist
-WORKDIR /app/agent
-RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+RUN if [ -f /app/agent/requirements.txt ]; then pip install --no-cache-dir -r /app/agent/requirements.txt; fi
 
-# Set environment
+# Set environment - simulate the original directory structure
 ENV JOLT_MODEL_DIR=/app/agent/models/jolt
 ENV ZKML_CLI_PATH=/usr/local/bin/zkml-cli
+# PYTHONPATH includes: /app for shared, /app/agent for the agent code
 ENV PYTHONPATH=/app:/app/agent
 
 # Port from environment (Render sets PORT)
 ENV PORT=8000
 EXPOSE ${PORT}
+
+# Set working directory for uvicorn
+WORKDIR /app/agent
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
