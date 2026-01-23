@@ -1,0 +1,27 @@
+# Dockerfile for Python agents
+FROM python:3.11-slim
+
+ARG AGENT_DIR
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy shared code
+COPY shared/ /app/shared/
+
+# Copy agent code
+COPY ${AGENT_DIR}/ /app/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Port can be overridden via environment variable
+ENV PORT=8000
+
+# Run the agent
+CMD python -m uvicorn main:app --host 0.0.0.0 --port ${PORT}

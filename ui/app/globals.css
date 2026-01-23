@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #ffffff;
+  --background: #0a0a0f;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00f0ff40;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff60;
+}
+
+/* Custom utilities */
+.glow-text {
+  text-shadow: 0 0 10px currentColor;
+}
+
+.glow-border {
+  box-shadow: 0 0 10px currentColor, inset 0 0 10px currentColor;
+}
+
+.card {
+  @apply bg-gray-900/50 border border-gray-800 rounded-lg backdrop-blur-sm;
+}
+
+.stat-value {
+  @apply text-3xl font-bold tabular-nums;
+}
+
+.stat-label {
+  @apply text-sm text-gray-400 uppercase tracking-wider;
+}
+
+/* Animation for new items */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Pulse animation for active elements */
+@keyframes activePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-active {
+  animation: activePulse 2s ease-in-out infinite;
+}

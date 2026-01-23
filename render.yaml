@@ -1,0 +1,115 @@
+# Render Blueprint for Threat Intelligence Network
+# Deploy with: https://render.com/docs/infrastructure-as-code
+
+services:
+  # Scout Agent - URL Discovery & Orchestration
+  - type: web
+    name: threat-intel-scout
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      pip install -r requirements.txt
+      pip install -r agents/scout/requirements.txt
+    startCommand: |
+      cd agents/scout && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: DATABASE_URL
+        fromDatabase:
+          name: threat-intel-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: threat-intel-redis
+          type: redis
+          property: connectionString
+      - key: SCOUT_URL
+        value: https://threat-intel-scout.onrender.com
+      - key: POLICY_URL
+        value: https://threat-intel-policy.onrender.com
+      - key: ANALYST_URL
+        value: https://threat-intel-analyst.onrender.com
+      - key: WEBSOCKET_URL
+        value: wss://threat-intel-scout.onrender.com/ws
+    healthCheckPath: /health
+
+  # Policy Agent - Authorization with zkML Proofs
+  - type: web
+    name: threat-intel-policy
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      pip install -r requirements.txt
+      pip install -r agents/policy/requirements.txt
+    startCommand: |
+      cd agents/policy && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: DATABASE_URL
+        fromDatabase:
+          name: threat-intel-db
+          property: connectionString
+      - key: POLICY_URL
+        value: https://threat-intel-policy.onrender.com
+    healthCheckPath: /health
+
+  # Analyst Agent - URL Classification with zkML Proofs
+  - type: web
+    name: threat-intel-analyst
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      pip install -r requirements.txt
+      pip install -r agents/analyst/requirements.txt
+    startCommand: |
+      cd agents/analyst && python -m uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: DATABASE_URL
+        fromDatabase:
+          name: threat-intel-db
+          property: connectionString
+      - key: ANALYST_URL
+        value: https://threat-intel-analyst.onrender.com
+    healthCheckPath: /health
+
+  # UI Dashboard - Next.js Frontend
+  - type: web
+    name: threat-intel-ui
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: cd ui && npm install && npm run build
+    startCommand: cd ui && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SCOUT_URL
+        value: https://threat-intel-scout.onrender.com
+      - key: NEXT_PUBLIC_POLICY_URL
+        value: https://threat-intel-policy.onrender.com
+      - key: NEXT_PUBLIC_ANALYST_URL
+        value: https://threat-intel-analyst.onrender.com
+      - key: NEXT_PUBLIC_WS_URL
+        value: wss://threat-intel-scout.onrender.com/ws
+    healthCheckPath: /
+
+  # Redis for Event Pub/Sub
+  - type: redis
+    name: threat-intel-redis
+    region: oregon
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+
+# PostgreSQL Database
+databases:
+  - name: threat-intel-db
+    region: oregon
+    plan: starter
+    postgresMajorVersion: 15
