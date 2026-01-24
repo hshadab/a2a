@@ -33,13 +33,18 @@ class Config:
     scout_batch_size: int = 50
 
     # Jolt Atlas paths - use jolt subdirectory models for zkML proof generation
+    # Note: In containers, PYTHONPATH is /opt/render/project/src
     jolt_atlas_path: str = os.getenv("JOLT_ATLAS_PATH", "./jolt-atlas")
     jolt_model_dir: str = os.getenv("JOLT_MODEL_DIR", "./agents/policy/models/jolt")
     authorization_model_path: str = os.getenv(
         "AUTH_MODEL_PATH",
         os.path.join(os.getenv("JOLT_MODEL_DIR", "./agents/policy/models/jolt"), "network.onnx")
     )
-    classifier_model_path: str = os.getenv("CLASSIFIER_MODEL_PATH", "./agents/analyst/models/url_classifier.onnx")
+    # Classifier model path - use env var or default (relative to PYTHONPATH in container)
+    classifier_model_path: str = os.getenv(
+        "CLASSIFIER_MODEL_PATH",
+        os.path.join(os.getenv("PYTHONPATH", "."), "agents/analyst/models/jolt/network.onnx")
+    )
 
     # WebSocket for UI
     websocket_url: str = os.getenv("WEBSOCKET_URL", "ws://localhost:8000/ws")

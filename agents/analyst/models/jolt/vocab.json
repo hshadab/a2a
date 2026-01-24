@@ -1,32 +1,166 @@
 {
-  "cheap": 1,
-  "flights": 2,
-  "to": 3,
-  "rome": 4,
-  "box": 5,
-  "office": 6,
-  "hits": 7,
-  "this": 8,
-  "weekend": 9,
-  "quarterly": 10,
-  "earnings": 11,
-  "beat": 12,
-  "guidance": 13,
-  "university": 14,
-  "admissions": 15,
-  "tips": 16,
-  "hotel": 17,
-  "booking": 18,
-  "refund": 19,
-  "policy": 20,
-  "new": 21,
-  "streaming": 22,
-  "series": 23,
-  "announced": 24,
-  "merger": 25,
-  "and": 26,
-  "acquisition": 27,
-  "news": 28,
-  "scholarships": 29,
-  "grants": 30
+  "vocab_mapping": {
+    "url_length": {
+      "index": 0,
+      "feature_type": "url_feature"
+    },
+    "domain_length": {
+      "index": 1,
+      "feature_type": "url_feature"
+    },
+    "path_length": {
+      "index": 2,
+      "feature_type": "url_feature"
+    },
+    "query_length": {
+      "index": 3,
+      "feature_type": "url_feature"
+    },
+    "subdomain_count": {
+      "index": 4,
+      "feature_type": "url_feature"
+    },
+    "has_ip_address": {
+      "index": 5,
+      "feature_type": "url_feature"
+    },
+    "has_port": {
+      "index": 6,
+      "feature_type": "url_feature"
+    },
+    "uses_https": {
+      "index": 7,
+      "feature_type": "url_feature"
+    },
+    "digit_count": {
+      "index": 8,
+      "feature_type": "url_feature"
+    },
+    "special_char_count": {
+      "index": 9,
+      "feature_type": "url_feature"
+    },
+    "digit_ratio": {
+      "index": 10,
+      "feature_type": "url_feature"
+    },
+    "entropy": {
+      "index": 11,
+      "feature_type": "url_feature"
+    },
+    "tld_risk_score": {
+      "index": 12,
+      "feature_type": "url_feature"
+    },
+    "typosquat_score": {
+      "index": 13,
+      "feature_type": "url_feature"
+    },
+    "has_brand_match": {
+      "index": 14,
+      "feature_type": "url_feature"
+    },
+    "levenshtein_distance": {
+      "index": 15,
+      "feature_type": "url_feature"
+    },
+    "path_depth": {
+      "index": 16,
+      "feature_type": "url_feature"
+    },
+    "query_param_count": {
+      "index": 17,
+      "feature_type": "url_feature"
+    },
+    "has_suspicious_path": {
+      "index": 18,
+      "feature_type": "url_feature"
+    },
+    "suspicious_keyword_count": {
+      "index": 19,
+      "feature_type": "url_feature"
+    },
+    "domain_phish_rate": {
+      "index": 20,
+      "feature_type": "url_feature"
+    },
+    "similar_domains_phish_rate": {
+      "index": 21,
+      "feature_type": "url_feature"
+    },
+    "registrar_phish_rate": {
+      "index": 22,
+      "feature_type": "url_feature"
+    },
+    "ip_phish_rate": {
+      "index": 23,
+      "feature_type": "url_feature"
+    },
+    "padding_24": {
+      "index": 24,
+      "feature_type": "url_feature"
+    },
+    "padding_25": {
+      "index": 25,
+      "feature_type": "url_feature"
+    },
+    "padding_26": {
+      "index": 26,
+      "feature_type": "url_feature"
+    },
+    "padding_27": {
+      "index": 27,
+      "feature_type": "url_feature"
+    },
+    "padding_28": {
+      "index": 28,
+      "feature_type": "url_feature"
+    },
+    "padding_29": {
+      "index": 29,
+      "feature_type": "url_feature"
+    },
+    "padding_30": {
+      "index": 30,
+      "feature_type": "url_feature"
+    },
+    "padding_31": {
+      "index": 31,
+      "feature_type": "url_feature"
+    }
+  },
+  "feature_names": [
+    "url_length",
+    "domain_length",
+    "path_length",
+    "query_length",
+    "subdomain_count",
+    "has_ip_address",
+    "has_port",
+    "uses_https",
+    "digit_count",
+    "special_char_count",
+    "digit_ratio",
+    "entropy",
+    "tld_risk_score",
+    "typosquat_score",
+    "has_brand_match",
+    "levenshtein_distance",
+    "path_depth",
+    "query_param_count",
+    "has_suspicious_path",
+    "suspicious_keyword_count",
+    "domain_phish_rate",
+    "similar_domains_phish_rate",
+    "registrar_phish_rate",
+    "ip_phish_rate",
+    "padding_24",
+    "padding_25",
+    "padding_26",
+    "padding_27",
+    "padding_28",
+    "padding_29",
+    "padding_30",
+    "padding_31"
+  ]
 }

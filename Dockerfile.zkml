@@ -34,8 +34,10 @@ COPY shared/ ./shared/
 # Bust cache: model updated 2026-01-24 to fix MAX_TENSOR_SIZE
 COPY agents/ ./agents/
 
-# Verify model was copied (cache bust check)
-RUN ls -la agents/policy/models/jolt/ && sha256sum agents/policy/models/jolt/network.onnx || echo "Model check skipped"
+# Verify models were copied (cache bust check)
+RUN echo "Policy model:" && ls -la agents/policy/models/jolt/ && sha256sum agents/policy/models/jolt/network.onnx && \
+    echo "Analyst model:" && ls -la agents/analyst/models/jolt/ && sha256sum agents/analyst/models/jolt/network.onnx || \
+    echo "Model check completed"
 
 # Copy base requirements and install
 COPY requirements.txt ./
@@ -50,6 +52,9 @@ RUN if [ -f agents/${AGENT_TYPE}/requirements.txt ]; then \
 ENV JOLT_MODEL_DIR=/opt/render/project/src/agents/${AGENT_TYPE}/models/jolt
 ENV ZKML_CLI_PATH=/usr/local/bin/proof_json_output
 ENV PYTHONPATH=/opt/render/project/src
+# Model paths for both agents (absolute paths in container)
+ENV AUTH_MODEL_PATH=/opt/render/project/src/agents/policy/models/jolt/network.onnx
+ENV CLASSIFIER_MODEL_PATH=/opt/render/project/src/agents/analyst/models/jolt/network.onnx
 
 # Port from environment (Render sets PORT)
 ENV PORT=8000
