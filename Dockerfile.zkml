@@ -5,7 +5,7 @@ FROM python:3.11-slim
 
 ARG AGENT_TYPE=scout
 # Cache bust arg to force rebuild when model files change
-ARG CACHE_BUST=20260124
+ARG CACHE_BUST=20260124b
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
