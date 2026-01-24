@@ -7,7 +7,6 @@ import {
   getHealthStatus,
   formatUSDC,
   formatNumber,
-  formatDuration,
   getEventIcon,
   getEventColor,
   NetworkStats,
@@ -23,7 +22,6 @@ import {
   Cpu,
 } from 'lucide-react';
 import AgentPipeline from '@/components/AgentPipeline';
-import TreasuryWidget from '@/components/TreasuryWidget';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 
@@ -73,63 +71,7 @@ export default function Dashboard() {
   }, [lastEvent]);
 
   return (
-    <div className="min-h-screen p-6">
-      {/* Header */}
-      <header className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <Shield className="text-cyber-blue" />
-              ThreatProof
-            </h1>
-            <p className="text-gray-400 mt-1">
-              Verifiable Threat Intelligence |{' '}
-              <span className="text-cyan-400">Google A2A</span> +{' '}
-              <span className="text-green-400">x402</span> +{' '}
-              <a
-                href="https://github.com/ICME-Lab/jolt-atlas"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-purple-400 hover:text-purple-300 underline decoration-dotted"
-              >
-                Jolt Atlas zkML
-              </a>
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            {/* WebSocket Connection Status */}
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-3 h-3 rounded-full ${
-                  isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-                }`}
-              />
-              <span className="text-sm text-gray-400">
-                {isConnected ? 'Live' : 'Disconnected'}
-              </span>
-            </div>
-
-            {/* Autonomous Mode Indicator */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
-              <Cpu size={14} className="text-cyan-400 animate-pulse" />
-              <span className="text-sm text-cyan-400">Autonomous</span>
-            </div>
-
-            {/* Running Time */}
-            {stats?.running_since && (
-              <div className="text-sm text-gray-400">
-                Uptime: {formatDuration(stats.running_since)}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Treasury Widget */}
-        <div className="mt-4">
-          <TreasuryWidget />
-        </div>
-      </header>
-
+    <div className="min-h-screen p-6 pt-4">
       {/* Agent Pipeline Visualization */}
       <section className="mb-8">
         <AgentPipeline

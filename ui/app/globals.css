@@ -369,20 +369,18 @@ body {
    ENHANCED GLOW EFFECTS
    ============================================ */
 
-/* Dramatic breathing glow for proving state */
+/* Breathing glow for proving state - shadow only, no transform */
 @keyframes glowBreathe {
   0%, 100% {
     box-shadow:
-      0 0 20px var(--glow-color, #a855f7),
-      0 0 40px var(--glow-color, #a855f7),
-      inset 0 0 20px rgba(168, 85, 247, 0.1);
+      0 0 15px var(--glow-color, #a855f7),
+      0 0 30px var(--glow-color, #a855f7);
   }
   50% {
     box-shadow:
-      0 0 40px var(--glow-color, #a855f7),
-      0 0 80px var(--glow-color, #a855f7),
-      0 0 120px var(--glow-color, #a855f7),
-      inset 0 0 40px rgba(168, 85, 247, 0.2);
+      0 0 25px var(--glow-color, #a855f7),
+      0 0 50px var(--glow-color, #a855f7),
+      0 0 75px var(--glow-color, #a855f7);
   }
 }
 
@@ -627,15 +625,13 @@ body {
   animation: ambientPulse 3s ease-in-out infinite;
 }
 
-/* Ambient glow for idle agents */
+/* Subtle border glow for idle agents - no transform */
 @keyframes idleGlow {
   0%, 100% {
-    box-shadow: 0 0 10px var(--glow-color, #3b82f6)20;
-    border-color: var(--glow-color, #3b82f6)40;
+    box-shadow: 0 0 8px var(--glow-color, #3b82f6)15;
   }
   50% {
-    box-shadow: 0 0 20px var(--glow-color, #3b82f6)40;
-    border-color: var(--glow-color, #3b82f6)70;
+    box-shadow: 0 0 15px var(--glow-color, #3b82f6)30;
   }
 }
 
@@ -660,17 +656,9 @@ body {
 .ambient-particle:nth-child(2) { animation-delay: 2s; }
 .ambient-particle:nth-child(3) { animation-delay: 4s; }
 
-/* Network heartbeat effect */
-@keyframes networkHeartbeat {
-  0%, 100% { transform: scale(1); }
-  5% { transform: scale(1.02); }
-  10% { transform: scale(1); }
-  15% { transform: scale(1.01); }
-  20% { transform: scale(1); }
-}
-
+/* Network alive indicator - subtle opacity pulse, no transform */
 .network-alive {
-  animation: networkHeartbeat 4s ease-in-out infinite;
+  /* No animation - just a class marker */
 }
 
 /* Monitoring text dots animation */
@@ -685,41 +673,35 @@ body {
   animation: dotsAnimation 1.5s ease-in-out infinite;
 }
 
-/* Ambient avatar pulse */
-@keyframes avatarIdle {
+/* Subtle glow pulse for idle avatars - no scaling/shaking */
+@keyframes avatarIdleGlow {
   0%, 100% {
-    transform: scale(1);
-    filter: brightness(1);
+    box-shadow: 0 0 10px var(--glow-color, #3b82f6)30;
   }
   50% {
-    transform: scale(1.02);
-    filter: brightness(1.1);
+    box-shadow: 0 0 20px var(--glow-color, #3b82f6)50;
   }
 }
 
 .avatar-idle {
-  animation: avatarIdle 3s ease-in-out infinite;
+  animation: avatarIdleGlow 3s ease-in-out infinite;
 }
 
-/* Scanning effect for idle agents */
+/* Subtle scan line for idle agents */
 @keyframes scanLine {
-  0% {
-    background-position: 0% 0%;
-  }
-  100% {
-    background-position: 0% 100%;
-  }
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 200%; }
 }
 
 .scan-effect {
   background: linear-gradient(
     180deg,
     transparent 0%,
-    rgba(59, 130, 246, 0.1) 50%,
+    rgba(59, 130, 246, 0.05) 50%,
     transparent 100%
   );
-  background-size: 100% 200%;
-  animation: scanLine 3s linear infinite;
+  background-size: 100% 50%;
+  animation: scanLine 4s linear infinite;
 }
 
 /* Continuous connection flow */
@@ -753,3 +735,40 @@ body {
 .stream-dot:nth-child(3) { animation-delay: 0.6s; }
 .stream-dot:nth-child(4) { animation-delay: 0.9s; }
 .stream-dot:nth-child(5) { animation-delay: 1.2s; }
+
+/* ============================================
+   ANIMATED ARROW CONNECTIONS
+   ============================================ */
+
+/* Arrow marker animation */
+@keyframes arrowPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.arrow-marker {
+  animation: arrowPulse 2s ease-in-out infinite;
+}
+
+/* Flowing line with arrow heads */
+@keyframes flowLine {
+  0% { stroke-dashoffset: 20; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.flow-line {
+  stroke-dasharray: 10 10;
+  animation: flowLine 1s linear infinite;
+}
+
+/* Bidirectional flow */
+@keyframes biFlow {
+  0%, 100% { opacity: 0.3; }
+  25% { opacity: 1; }
+  50% { opacity: 0.3; }
+  75% { opacity: 1; }
+}
+
+.bi-flow {
+  animation: biFlow 3s ease-in-out infinite;
+}

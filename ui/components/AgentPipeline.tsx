@@ -262,31 +262,27 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     <div className="w-full network-alive">
       {/* Pipeline Container with SVG Connections */}
       <div className="relative flex items-stretch justify-between gap-2">
-        {/* SVG Layer for Connection Lines */}
+        {/* SVG Layer for Connection Arrows */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ zIndex: 0 }}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
         >
           <defs>
-            {/* Gradient for active flow */}
-            <linearGradient id="flowGradientRight" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.2" />
-              <stop offset="50%" stopColor="#fbbf24" stopOpacity="1" />
-              <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.2" />
-            </linearGradient>
-            <linearGradient id="flowGradientLeft" x1="100%" y1="0%" x2="0%" y2="0%">
-              <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.2" />
-              <stop offset="50%" stopColor="#22d3ee" stopOpacity="1" />
-              <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.2" />
-            </linearGradient>
-            <linearGradient id="paymentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#22c55e" stopOpacity="0.2" />
-              <stop offset="50%" stopColor="#22c55e" stopOpacity="1" />
-              <stop offset="100%" stopColor="#22c55e" stopOpacity="0.2" />
-            </linearGradient>
+            {/* Arrow markers */}
+            <marker id="arrowRight" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" className="arrow-marker" />
+            </marker>
+            <marker id="arrowRightActive" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24" />
+            </marker>
+            <marker id="arrowLeft" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto-start-reverse">
+              <path d="M 10 0 L 0 5 L 10 10 z" fill="#22d3ee" />
+            </marker>
             {/* Glow filter */}
             <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
               <feMerge>
                 <feMergeNode in="coloredBlur" />
                 <feMergeNode in="SourceGraphic" />
@@ -294,118 +290,60 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
             </filter>
           </defs>
 
-          {/* Connection: Scout to Policy */}
-          <g className="connection-scout-policy">
-            {/* Background ambient line - always visible with glow */}
-            <path
-              d="M 25% 50% Q 32% 35% 40% 50%"
-              fill="none"
-              stroke="#3b82f6"
-              strokeWidth="2"
-              strokeOpacity="0.3"
-              className="connection-ambient"
-            />
-            {/* Active flow line */}
-            <path
-              d="M 25% 50% Q 32% 35% 40% 50%"
-              fill="none"
-              stroke={activeFlow === 'scout-policy' ? 'url(#flowGradientRight)' : activeFlow === 'policy-scout' ? 'url(#flowGradientLeft)' : '#3b82f6'}
-              strokeWidth={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 3 : 2}
-              strokeOpacity={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 1 : 0.5}
-              className={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'dash-flow' : 'continuous-flow'}
-              filter={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'url(#glow)' : 'none'}
-            />
-            {/* Ambient particles - always flowing (dimmer when idle) */}
-            {[0, 1, 2].map(i => (
-              <circle
-                key={`ambient-sp-${i}`}
-                r={activeFlow === 'scout-policy' ? 4 : 2}
-                fill={activeFlow === 'scout-policy' ? '#fbbf24' : '#3b82f6'}
-                opacity={activeFlow === 'scout-policy' ? 1 : 0.4}
-                filter={activeFlow === 'scout-policy' ? 'url(#glow)' : 'none'}
-                style={{
-                  offsetPath: "path('M 25% 50% Q 32% 35% 40% 50%')",
-                  offsetRotate: '0deg',
-                } as any}
-                className={activeFlow === 'scout-policy' ? 'path-particle' : 'ambient-particle'}
-              />
-            ))}
-            {/* Reverse flow particles */}
-            {activeFlow === 'policy-scout' && (
-              <>
-                {[0, 1, 2].map(i => (
-                  <circle
-                    key={i}
-                    r="4"
-                    fill="#22d3ee"
-                    filter="url(#glow)"
-                    style={{
-                      offsetPath: "path('M 40% 50% Q 32% 35% 25% 50%')",
-                      offsetRotate: '0deg',
-                    } as any}
-                    className="path-particle"
-                  />
-                ))}
-              </>
-            )}
-          </g>
+          {/* Connection: Scout to Policy - Top arrow (request) */}
+          <line
+            x1="26" y1="42"
+            x2="40" y2="42"
+            stroke={activeFlow === 'scout-policy' ? '#fbbf24' : '#3b82f6'}
+            strokeWidth="0.4"
+            strokeOpacity={activeFlow === 'scout-policy' ? 1 : 0.6}
+            markerEnd={activeFlow === 'scout-policy' ? 'url(#arrowRightActive)' : 'url(#arrowRight)'}
+            className={activeFlow === 'scout-policy' ? '' : 'flow-line'}
+            filter={activeFlow === 'scout-policy' ? 'url(#glow)' : 'none'}
+          />
+          {/* Scout to Policy - Bottom arrow (response) */}
+          <line
+            x1="40" y1="48"
+            x2="26" y2="48"
+            stroke={activeFlow === 'policy-scout' ? '#22d3ee' : '#3b82f6'}
+            strokeWidth="0.4"
+            strokeOpacity={activeFlow === 'policy-scout' ? 1 : 0.4}
+            markerEnd="url(#arrowLeft)"
+            className={activeFlow === 'policy-scout' ? '' : 'flow-line'}
+            style={{ animationDirection: 'reverse' }}
+            filter={activeFlow === 'policy-scout' ? 'url(#glow)' : 'none'}
+          />
 
-          {/* Connection: Policy to Analyst */}
-          <g className="connection-policy-analyst">
-            {/* Background ambient line - always visible with glow */}
-            <path
-              d="M 60% 50% Q 68% 35% 75% 50%"
-              fill="none"
-              stroke="#a855f7"
-              strokeWidth="2"
-              strokeOpacity="0.3"
-              className="connection-ambient"
-              style={{ animationDelay: '1.5s' }}
-            />
-            {/* Active flow line */}
-            <path
-              d="M 60% 50% Q 68% 35% 75% 50%"
-              fill="none"
-              stroke={activeFlow === 'policy-analyst' ? 'url(#flowGradientRight)' : activeFlow === 'analyst-scout' ? 'url(#flowGradientLeft)' : '#a855f7'}
-              strokeWidth={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 3 : 2}
-              strokeOpacity={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 1 : 0.5}
-              className={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'dash-flow' : 'continuous-flow'}
-              filter={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
-            />
-            {/* Ambient particles - always flowing */}
-            {[0, 1, 2].map(i => (
-              <circle
-                key={`ambient-pa-${i}`}
-                r={activeFlow === 'policy-analyst' ? 4 : 2}
-                fill={activeFlow === 'policy-analyst' ? '#fbbf24' : '#a855f7'}
-                opacity={activeFlow === 'policy-analyst' ? 1 : 0.4}
-                filter={activeFlow === 'policy-analyst' ? 'url(#glow)' : 'none'}
-                style={{
-                  offsetPath: "path('M 60% 50% Q 68% 35% 75% 50%')",
-                  offsetRotate: '0deg',
-                  animationDelay: `${i * 2 + 1}s`,
-                } as any}
-                className={activeFlow === 'policy-analyst' ? 'path-particle' : 'ambient-particle'}
-              />
-            ))}
-            {/* Reverse flow particles */}
-            {activeFlow === 'analyst-scout' && (
-              <>
-                {[0, 1, 2].map(i => (
-                  <circle
-                    key={i}
-                    r="4"
-                    fill="#22d3ee"
-                    filter="url(#glow)"
-                    style={{
-                      offsetPath: "path('M 75% 50% Q 68% 35% 60% 50%')",
-                      offsetRotate: '0deg',
-                    } as any}
-                    className="path-particle"
-                  />
-                ))}
-              </>
-            )}
+          {/* Connection: Policy to Analyst - Top arrow (request) */}
+          <line
+            x1="60" y1="42"
+            x2="74" y2="42"
+            stroke={activeFlow === 'policy-analyst' ? '#fbbf24' : '#a855f7'}
+            strokeWidth="0.4"
+            strokeOpacity={activeFlow === 'policy-analyst' ? 1 : 0.6}
+            markerEnd={activeFlow === 'policy-analyst' ? 'url(#arrowRightActive)' : 'url(#arrowRight)'}
+            className={activeFlow === 'policy-analyst' ? '' : 'flow-line'}
+            filter={activeFlow === 'policy-analyst' ? 'url(#glow)' : 'none'}
+          />
+          {/* Policy to Analyst - Bottom arrow (response) */}
+          <line
+            x1="74" y1="48"
+            x2="60" y2="48"
+            stroke={activeFlow === 'analyst-scout' ? '#22d3ee' : '#a855f7'}
+            strokeWidth="0.4"
+            strokeOpacity={activeFlow === 'analyst-scout' ? 1 : 0.4}
+            markerEnd="url(#arrowLeft)"
+            className={activeFlow === 'analyst-scout' ? '' : 'flow-line'}
+            style={{ animationDirection: 'reverse', animationDelay: '0.5s' }}
+            filter={activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
+          />
+
+          {/* Central data flow indicator */}
+          <g className="bi-flow">
+            <text x="33" y="38" fontSize="2" fill="#3b82f6" opacity="0.7">DATA</text>
+            <text x="33" y="53" fontSize="2" fill="#22d3ee" opacity="0.7">PROOF</text>
+            <text x="66" y="38" fontSize="2" fill="#a855f7" opacity="0.7">URLs</text>
+            <text x="66" y="53" fontSize="2" fill="#22d3ee" opacity="0.7">RESULT</text>
           </g>
         </svg>
 
