@@ -10,10 +10,16 @@ export default function AboutPage() {
         <h1 className="text-4xl font-bold text-white mb-4">
           How <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">ThreatProof</span> Works
         </h1>
-        <p className="text-xl text-gray-400 max-w-3xl mx-auto">
+        <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-6">
           An autonomous network of AI agents that discover, classify, and verify phishing threats
           using cryptographic proofs — powered by three groundbreaking protocols.
         </p>
+        <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 rounded-full">
+          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          <span className="text-cyan-400 font-medium">Autonomous Agent-to-Agent Commerce</span>
+          <span className="text-gray-600">|</span>
+          <span className="text-gray-400 text-sm">A self-sustaining AI micro-economy</span>
+        </div>
       </section>
 
       {/* Architecture Overview */}
@@ -220,15 +226,26 @@ let proof = jolt_atlas::prove(
       </div>
 
       {/* Self-Sustaining Economy */}
-      <section className="card p-8">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-          <Zap className="text-yellow-400" />
-          Self-Sustaining Agent Economy
-        </h2>
+      <section className="card p-8 border border-cyan-500/20">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+            <Zap className="text-yellow-400" />
+            The AI Micro-Economy
+          </h2>
+          <span className="px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-sm text-green-400">
+            Self-Sustaining
+          </span>
+        </div>
+
+        <p className="text-lg text-gray-300 mb-6 border-l-4 border-cyan-500 pl-4">
+          ThreatProof demonstrates <strong className="text-cyan-400">autonomous agent-to-agent commerce</strong> —
+          a mini-economy where AI agents discover work, negotiate prices, exchange payments, and verify results
+          without any human intervention.
+        </p>
 
         <div className="grid grid-cols-2 gap-8">
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">How It Works</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">How The Economy Works</h3>
             <p className="text-gray-400 mb-4">
               All three agents share the same treasury wallet. When Scout "pays" Policy or Analyst,
               the USDC moves from the treasury... back to the treasury. The money circulates internally.

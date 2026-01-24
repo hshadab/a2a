@@ -83,7 +83,17 @@ export default function Dashboard() {
               ThreatProof
             </h1>
             <p className="text-gray-400 mt-1">
-              Verifiable Threat Intelligence | A2A + x402 + zkML
+              Verifiable Threat Intelligence |{' '}
+              <span className="text-cyan-400">Google A2A</span> +{' '}
+              <span className="text-green-400">x402</span> +{' '}
+              <a
+                href="https://github.com/ICME-Lab/jolt-atlas"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 underline decoration-dotted"
+              >
+                Jolt Atlas zkML
+              </a>
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -198,51 +208,44 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Why zkML Section */}
-      <section className="mt-8 card p-6">
-        <h2 className="text-lg font-semibold mb-4">Why zkML is "Must Have"</h2>
-        <div className="grid grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <h3 className="text-cyber-red font-medium">Without Proofs</h3>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li className="flex items-center gap-2">
-                <span className="text-red-500">✗</span>
-                Policy Agent could approve everything
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-500">✗</span>
-                Analyst could return fake classifications
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-500">✗</span>
-                No way to verify work was done
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-red-500">✗</span>
-                Database could be full of garbage
-              </li>
-            </ul>
+      {/* Autonomous Economy Section */}
+      <section className="mt-8 card p-6 border border-cyan-500/20">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+            <Cpu className="text-cyan-400" size={20} />
           </div>
-          <div className="space-y-3">
-            <h3 className="text-cyber-green font-medium">With zkML Proofs</h3>
-            <ul className="space-y-2 text-sm text-gray-400">
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Every authorization is cryptographically verified
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Every classification is provably correct
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Model commitment binds exact computation
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                Trustless agent collaboration
-              </li>
-            </ul>
+          <div>
+            <h2 className="text-lg font-semibold text-white">Autonomous Agent-to-Agent Commerce</h2>
+            <p className="text-sm text-gray-500">A self-sustaining AI micro-economy</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-400" />
+              <span className="text-sm font-medium text-cyan-400">Discover</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              Scout Agent autonomously discovers URLs from threat feeds and pays Policy Agent for authorization decisions.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-400" />
+              <span className="text-sm font-medium text-green-400">Pay & Verify</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              Agents exchange USDC via x402 protocol. Every payment triggers zkML proof generation to verify honest work.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-purple-400" />
+              <span className="text-sm font-medium text-purple-400">Self-Sustaining</span>
+            </div>
+            <p className="text-xs text-gray-400">
+              USDC circulates between agents in a closed loop. Only gas is consumed—the economy runs indefinitely.
+            </p>
           </div>
         </div>
       </section>
