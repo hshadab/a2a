@@ -12,6 +12,6 @@
     "SUSPICIOUS",
     "UNKNOWN"
   ],
-  "training_accuracy": 99.9750018119812,
+  "training_accuracy": 99.38750267028809,
   "validation_accuracy": 100.0
 }
