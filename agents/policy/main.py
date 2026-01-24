@@ -270,6 +270,7 @@ async def debug_prover():
     """Debug endpoint to test prover directly"""
     import subprocess
     import os
+    import hashlib
 
     zkml_path = os.environ.get('ZKML_CLI_PATH', 'zkml-cli')
     jolt_model_dir = os.environ.get('JOLT_MODEL_DIR', '')
@@ -284,43 +285,43 @@ async def debug_prover():
         "model_exists": os.path.isfile(model_path) if model_path else False,
     }
 
-    # Test with simple_test.onnx (multiclass0 model, known to work with small tensors)
-    multiclass_model = "/opt/render/project/src/agents/policy/models/jolt/simple_test.onnx"
-    if result["zkml_exists"]:
-        result["multiclass_model_exists"] = os.path.isfile(multiclass_model)
+    # Get model hash to verify it's the new small model
+    if result["model_exists"]:
+        with open(model_path, 'rb') as f:
+            result["model_hash"] = hashlib.sha256(f.read()).hexdigest()
+        result["expected_hash"] = "15cc010f93ca0733ab186593161c350a020bc9d49125e065d3a8632d95efeade"
+        result["is_new_model"] = result["model_hash"] == result["expected_hash"]
 
-        if result.get("multiclass_model_exists"):
-            try:
-                # multiclass0 expects L=8 token IDs (integers)
-                test_inputs = ["1", "2", "3", "4", "5", "0", "0", "0"]  # 8 inputs
-                cmd = [zkml_path, multiclass_model] + test_inputs
-                proc = subprocess.run(cmd, capture_output=True, timeout=180)
-                result["multiclass_test"] = {
-                    "returncode": proc.returncode,
-                    "stdout": proc.stdout.decode()[:2000],
-                    "stderr_last": proc.stderr.decode()[-2000:]
-                }
-            except Exception as e:
-                result["multiclass_test_error"] = str(e)
-
-    # Also test the authorization model to show the error
-    if result["zkml_exists"] and result["model_exists"]:
+    # Test the new smaller authorization model with one-hot inputs
+    if result["zkml_exists"] and result.get("is_new_model"):
         try:
-            # Build one-hot vector (will fail due to MAX_TENSOR_SIZE)
+            # Build one-hot vector (should work with new 64->16->4 model)
             one_hot = [0] * 64
             one_hot[15] = 1   # budget_15
             one_hot[23] = 1   # trust_7
+            one_hot[30] = 1   # amount_6
+            one_hot[41] = 1   # category_1
+            one_hot[46] = 1   # velocity_2
+            one_hot[54] = 1   # day_2
+            one_hot[62] = 1   # time_2
             test_inputs = [str(v) for v in one_hot]
 
             cmd = [zkml_path, model_path] + test_inputs
-            proc = subprocess.run(cmd, capture_output=True, timeout=60)
+            result["command"] = f"{zkml_path} {model_path} " + " ".join(test_inputs[:10]) + " ..."
+
+            proc = subprocess.run(cmd, capture_output=True, timeout=120)
             result["auth_model_test"] = {
                 "returncode": proc.returncode,
-                "error_summary": "MAX_TENSOR_SIZE exceeded" if proc.returncode != 0 else "OK",
-                "stderr_last": proc.stderr.decode()[-1000:]
+                "success": proc.returncode == 0,
+                "stdout_preview": proc.stdout.decode()[:500] if proc.stdout else "",
+                "stderr_last": proc.stderr.decode()[-500:] if proc.stderr else ""
             }
+        except subprocess.TimeoutExpired:
+            result["auth_model_test_error"] = "Timeout after 120s"
         except Exception as e:
             result["auth_model_test_error"] = str(e)
+    elif result["zkml_exists"] and not result.get("is_new_model"):
+        result["auth_model_test_skipped"] = "Model is not the new smaller version"
 
     return result
 
