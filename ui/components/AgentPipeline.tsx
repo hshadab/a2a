@@ -259,7 +259,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full network-alive">
       {/* Pipeline Container with SVG Connections */}
       <div className="relative flex items-stretch justify-between gap-2">
         {/* SVG Layer for Connection Lines */}
@@ -296,33 +296,41 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
           {/* Connection: Scout to Policy */}
           <g className="connection-scout-policy">
+            {/* Background ambient line - always visible with glow */}
             <path
               d="M 25% 50% Q 32% 35% 40% 50%"
               fill="none"
-              stroke={activeFlow === 'scout-policy' ? 'url(#flowGradientRight)' : activeFlow === 'policy-scout' ? 'url(#flowGradientLeft)' : '#374151'}
+              stroke="#3b82f6"
+              strokeWidth="2"
+              strokeOpacity="0.3"
+              className="connection-ambient"
+            />
+            {/* Active flow line */}
+            <path
+              d="M 25% 50% Q 32% 35% 40% 50%"
+              fill="none"
+              stroke={activeFlow === 'scout-policy' ? 'url(#flowGradientRight)' : activeFlow === 'policy-scout' ? 'url(#flowGradientLeft)' : '#3b82f6'}
               strokeWidth={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 3 : 2}
-              strokeDasharray={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'none' : '8 4'}
-              className={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'dash-flow' : ''}
+              strokeOpacity={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 1 : 0.5}
+              className={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'dash-flow' : 'continuous-flow'}
               filter={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'url(#glow)' : 'none'}
             />
-            {/* Animated particles */}
-            {activeFlow === 'scout-policy' && (
-              <>
-                {[0, 1, 2].map(i => (
-                  <circle
-                    key={i}
-                    r="4"
-                    fill="#fbbf24"
-                    filter="url(#glow)"
-                    style={{
-                      offsetPath: "path('M 25% 50% Q 32% 35% 40% 50%')",
-                      offsetRotate: '0deg',
-                    } as any}
-                    className="path-particle"
-                  />
-                ))}
-              </>
-            )}
+            {/* Ambient particles - always flowing (dimmer when idle) */}
+            {[0, 1, 2].map(i => (
+              <circle
+                key={`ambient-sp-${i}`}
+                r={activeFlow === 'scout-policy' ? 4 : 2}
+                fill={activeFlow === 'scout-policy' ? '#fbbf24' : '#3b82f6'}
+                opacity={activeFlow === 'scout-policy' ? 1 : 0.4}
+                filter={activeFlow === 'scout-policy' ? 'url(#glow)' : 'none'}
+                style={{
+                  offsetPath: "path('M 25% 50% Q 32% 35% 40% 50%')",
+                  offsetRotate: '0deg',
+                } as any}
+                className={activeFlow === 'scout-policy' ? 'path-particle' : 'ambient-particle'}
+              />
+            ))}
+            {/* Reverse flow particles */}
             {activeFlow === 'policy-scout' && (
               <>
                 {[0, 1, 2].map(i => (
@@ -344,33 +352,43 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
           {/* Connection: Policy to Analyst */}
           <g className="connection-policy-analyst">
+            {/* Background ambient line - always visible with glow */}
             <path
               d="M 60% 50% Q 68% 35% 75% 50%"
               fill="none"
-              stroke={activeFlow === 'policy-analyst' ? 'url(#flowGradientRight)' : activeFlow === 'analyst-scout' ? 'url(#flowGradientLeft)' : '#374151'}
+              stroke="#a855f7"
+              strokeWidth="2"
+              strokeOpacity="0.3"
+              className="connection-ambient"
+              style={{ animationDelay: '1.5s' }}
+            />
+            {/* Active flow line */}
+            <path
+              d="M 60% 50% Q 68% 35% 75% 50%"
+              fill="none"
+              stroke={activeFlow === 'policy-analyst' ? 'url(#flowGradientRight)' : activeFlow === 'analyst-scout' ? 'url(#flowGradientLeft)' : '#a855f7'}
               strokeWidth={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 3 : 2}
-              strokeDasharray={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'none' : '8 4'}
-              className={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'dash-flow' : ''}
+              strokeOpacity={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 1 : 0.5}
+              className={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'dash-flow' : 'continuous-flow'}
               filter={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
             />
-            {/* Animated particles */}
-            {activeFlow === 'policy-analyst' && (
-              <>
-                {[0, 1, 2].map(i => (
-                  <circle
-                    key={i}
-                    r="4"
-                    fill="#fbbf24"
-                    filter="url(#glow)"
-                    style={{
-                      offsetPath: "path('M 60% 50% Q 68% 35% 75% 50%')",
-                      offsetRotate: '0deg',
-                    } as any}
-                    className="path-particle"
-                  />
-                ))}
-              </>
-            )}
+            {/* Ambient particles - always flowing */}
+            {[0, 1, 2].map(i => (
+              <circle
+                key={`ambient-pa-${i}`}
+                r={activeFlow === 'policy-analyst' ? 4 : 2}
+                fill={activeFlow === 'policy-analyst' ? '#fbbf24' : '#a855f7'}
+                opacity={activeFlow === 'policy-analyst' ? 1 : 0.4}
+                filter={activeFlow === 'policy-analyst' ? 'url(#glow)' : 'none'}
+                style={{
+                  offsetPath: "path('M 60% 50% Q 68% 35% 75% 50%')",
+                  offsetRotate: '0deg',
+                  animationDelay: `${i * 2 + 1}s`,
+                } as any}
+                className={activeFlow === 'policy-analyst' ? 'path-particle' : 'ambient-particle'}
+              />
+            ))}
+            {/* Reverse flow particles */}
             {activeFlow === 'analyst-scout' && (
               <>
                 {[0, 1, 2].map(i => (
@@ -497,16 +515,24 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       {/* Flow Legend */}
       <div className="flex justify-center gap-6 mt-6 text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_8px_#fbbf24]" />
+          <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_8px_#fbbf24] status-active" />
           <span>Request/Data</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+          <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] status-active" style={{ animationDelay: '0.3s' }} />
           <span>Response/Proof</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#22c55e]" />
+          <div className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#22c55e] status-active" style={{ animationDelay: '0.6s' }} />
           <span>Payment</span>
+        </div>
+        <div className="flex items-center gap-2 ml-4 border-l border-gray-700 pl-4">
+          <span className="text-cyan-400">Network Active</span>
+          <span className="flex gap-0.5">
+            <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
+            <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
+            <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
+          </span>
         </div>
       </div>
 
@@ -592,18 +618,23 @@ function AgentCard({
   return (
     <div
       className={`flex-1 rounded-xl border bg-gray-900/50 backdrop-blur-sm transition-all duration-500 relative z-10 ${
-        isProving ? 'glow-breathe' : ''
+        isProving ? 'glow-breathe' : isWorking ? '' : 'idle-glow'
       }`}
       style={{
-        borderColor: isActive ? colorHex : '#374151',
+        borderColor: isActive ? colorHex : `${colorHex}60`,
         ['--glow-color' as any]: colorHex,
         boxShadow: isWorking
           ? `0 0 30px ${colorHex}40`
           : isActive
           ? `0 0 15px ${colorHex}20`
-          : 'none',
+          : `0 0 10px ${colorHex}15`,
       }}
     >
+      {/* Scan effect overlay when idle */}
+      {!isActive && (
+        <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none scan-effect" />
+      )}
+
       {/* Ripple rings when proving */}
       {isProving && (
         <>
@@ -621,7 +652,7 @@ function AgentCard({
             <div className="relative">
               <div
                 className={`w-16 h-16 rounded-full flex items-center justify-center border-2 relative ${
-                  isWorking ? 'animate-spin-slow' : ''
+                  isWorking ? 'animate-spin-slow' : isProving ? '' : 'avatar-idle'
                 }`}
                 style={{
                   borderColor: colorHex,
@@ -689,8 +720,9 @@ function AgentCard({
                 ? 'bg-green-500/20 text-green-400'
                 : isActive
                 ? 'bg-blue-500/20 text-blue-400'
-                : 'bg-gray-700/50 text-gray-500'
+                : 'bg-gray-700/50'
             }`}
+            style={{ color: !isActive ? colorHex : undefined }}
           >
             {isProving && (
               <span className="w-2 h-2 rounded-full bg-yellow-400 status-active" />
@@ -702,10 +734,10 @@ function AgentCard({
               <span className="w-2 h-2 rounded-full bg-blue-400" />
             )}
             {!isActive && (
-              <span className="w-2 h-2 rounded-full bg-gray-500" />
+              <span className="w-2 h-2 rounded-full status-active" style={{ backgroundColor: colorHex }} />
             )}
             <span>
-              {isProving ? 'PROVING' : isWorking ? 'WORKING' : isActive ? 'ACTIVE' : 'IDLE'}
+              {isProving ? 'PROVING' : isWorking ? 'WORKING' : isActive ? 'ACTIVE' : 'READY'}
             </span>
           </div>
         </div>
@@ -728,7 +760,14 @@ function AgentCard({
         <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Recent Activity</p>
         <div className="space-y-2 min-h-[100px]">
           {events.length === 0 ? (
-            <p className="text-gray-600 text-sm italic">Waiting...</p>
+            <div className="flex items-center gap-2 text-sm" style={{ color: colorHex }}>
+              <span className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full stream-dot" style={{ backgroundColor: colorHex }} />
+                <span className="w-1.5 h-1.5 rounded-full stream-dot" style={{ backgroundColor: colorHex }} />
+                <span className="w-1.5 h-1.5 rounded-full stream-dot" style={{ backgroundColor: colorHex }} />
+              </span>
+              <span className="opacity-70">Monitoring network</span>
+            </div>
           ) : (
             events.map((event, i) => (
               <div

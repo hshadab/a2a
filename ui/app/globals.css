@@ -606,3 +606,150 @@ body {
   opacity: 0.3;
   animation: rippleOut 2s ease-out infinite;
 }
+
+/* ============================================
+   ALWAYS-ON AMBIENT ANIMATIONS
+   ============================================ */
+
+/* Ambient pulse for connection lines (always active) */
+@keyframes ambientPulse {
+  0%, 100% {
+    stroke-opacity: 0.3;
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50% {
+    stroke-opacity: 0.6;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+}
+
+.connection-ambient {
+  animation: ambientPulse 3s ease-in-out infinite;
+}
+
+/* Ambient glow for idle agents */
+@keyframes idleGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px var(--glow-color, #3b82f6)20;
+    border-color: var(--glow-color, #3b82f6)40;
+  }
+  50% {
+    box-shadow: 0 0 20px var(--glow-color, #3b82f6)40;
+    border-color: var(--glow-color, #3b82f6)70;
+  }
+}
+
+.idle-glow {
+  animation: idleGlow 4s ease-in-out infinite;
+}
+
+/* Subtle ambient particles flowing */
+@keyframes ambientFlow {
+  0% { offset-distance: 0%; opacity: 0; }
+  20% { opacity: 0.3; }
+  80% { opacity: 0.3; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.ambient-particle {
+  offset-rotate: 0deg;
+  animation: ambientFlow 6s ease-in-out infinite;
+}
+
+.ambient-particle:nth-child(1) { animation-delay: 0s; }
+.ambient-particle:nth-child(2) { animation-delay: 2s; }
+.ambient-particle:nth-child(3) { animation-delay: 4s; }
+
+/* Network heartbeat effect */
+@keyframes networkHeartbeat {
+  0%, 100% { transform: scale(1); }
+  5% { transform: scale(1.02); }
+  10% { transform: scale(1); }
+  15% { transform: scale(1.01); }
+  20% { transform: scale(1); }
+}
+
+.network-alive {
+  animation: networkHeartbeat 4s ease-in-out infinite;
+}
+
+/* Monitoring text dots animation */
+@keyframes dotsAnimation {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+.monitoring-dots::after {
+  content: '...';
+  animation: dotsAnimation 1.5s ease-in-out infinite;
+}
+
+/* Ambient avatar pulse */
+@keyframes avatarIdle {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.02);
+    filter: brightness(1.1);
+  }
+}
+
+.avatar-idle {
+  animation: avatarIdle 3s ease-in-out infinite;
+}
+
+/* Scanning effect for idle agents */
+@keyframes scanLine {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 0% 100%;
+  }
+}
+
+.scan-effect {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 100% 200%;
+  animation: scanLine 3s linear infinite;
+}
+
+/* Continuous connection flow */
+@keyframes continuousFlow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -48; }
+}
+
+.continuous-flow {
+  stroke-dasharray: 12 12;
+  animation: continuousFlow 2s linear infinite;
+}
+
+/* Data stream dots */
+@keyframes streamDot {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+.stream-dot {
+  animation: streamDot 2s ease-in-out infinite;
+}
+
+.stream-dot:nth-child(2) { animation-delay: 0.3s; }
+.stream-dot:nth-child(3) { animation-delay: 0.6s; }
+.stream-dot:nth-child(4) { animation-delay: 0.9s; }
+.stream-dot:nth-child(5) { animation-delay: 1.2s; }
