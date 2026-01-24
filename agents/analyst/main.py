@@ -315,6 +315,47 @@ async def stats():
     return analyst_agent.get_stats()
 
 
+@app.get("/debug-prover")
+async def debug_prover():
+    """Debug endpoint to test prover directly"""
+    import subprocess
+    import os
+
+    zkml_path = os.environ.get('ZKML_CLI_PATH', 'zkml-cli')
+    model_path = os.environ.get('CLASSIFIER_MODEL_PATH', config.classifier_model_path)
+
+    result = {
+        "zkml_path": zkml_path,
+        "zkml_exists": os.path.isfile(zkml_path),
+        "zkml_executable": os.access(zkml_path, os.X_OK) if os.path.isfile(zkml_path) else False,
+        "model_path": model_path,
+        "model_exists": os.path.isfile(model_path),
+        "jolt_model_dir": os.environ.get('JOLT_MODEL_DIR', 'not set'),
+    }
+
+    # Test the classifier model with simple inputs (32 values, scale 128)
+    if result["zkml_exists"] and result["model_exists"]:
+        try:
+            # Simple test inputs (scaled 0-128)
+            test_inputs = [64] * 32  # All 0.5 values scaled
+            cmd = [zkml_path, model_path] + [str(v) for v in test_inputs]
+            result["command"] = f"{zkml_path} {model_path} " + " ".join([str(v) for v in test_inputs[:5]]) + " ..."
+
+            proc = subprocess.run(cmd, capture_output=True, timeout=120)
+            result["classifier_test"] = {
+                "returncode": proc.returncode,
+                "success": proc.returncode == 0,
+                "stdout_preview": proc.stdout.decode()[:500] if proc.stdout else "",
+                "stderr_last": proc.stderr.decode()[-500:] if proc.stderr else ""
+            }
+        except subprocess.TimeoutExpired:
+            result["classifier_test_error"] = "Timeout after 120s"
+        except Exception as e:
+            result["classifier_test_error"] = str(e)
+
+    return result
+
+
 @app.post("/skills/classify-urls")
 async def classify_urls(
     request: ClassifyRequest,
