@@ -4,6 +4,8 @@ Policy Agent
 Authorizes spending on URL classification with zkML proofs.
 Uses Jolt Atlas to generate cryptographic proofs that the authorization
 decision was computed correctly.
+
+Model version: 2026-01-24 (64->16->4 architecture for MAX_TENSOR_SIZE=1024)
 """
 import asyncio
 import os
