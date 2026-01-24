@@ -55,6 +55,7 @@ interface AgentPipelineProps {
 
 export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelineProps) {
   const [particles, setParticles] = useState<{ id: number; from: string; to: string }[]>([]);
+  const [proofProgress, setProofProgress] = useState<{ policy: number; analyst: number }>({ policy: 0, analyst: 0 });
 
   // Track proof state for each agent
   const [policyProof, setPolicyProof] = useState<ProofData | null>(null);
@@ -63,6 +64,9 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
   const [analystProofStage, setAnalystProofStage] = useState<ProofStage | null>(null);
   const [policyVerifyChecks, setPolicyVerifyChecks] = useState<VerificationCheck[]>([]);
   const [analystVerifyChecks, setAnalystVerifyChecks] = useState<VerificationCheck[]>([]);
+
+  // Track current payment info for annotations
+  const [currentPayment, setCurrentPayment] = useState<{ amount: number; recipient: string } | null>(null);
 
   // Update proof state based on events
   useEffect(() => {
@@ -75,10 +79,12 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           message: lastEvent.data.message || 'Generating zkML proof...',
           progress_pct: lastEvent.data.progress_pct || 50,
         });
+        setProofProgress(prev => ({ ...prev, policy: lastEvent.data.progress_pct || 50 }));
         break;
 
       case 'POLICY_RESPONSE':
         setPolicyProofStage(null);
+        setProofProgress(prev => ({ ...prev, policy: 100 }));
         if (lastEvent.data.proof) {
           setPolicyProof({
             proof_hash: lastEvent.data.proof.proof_hash || '',
@@ -107,10 +113,12 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           message: lastEvent.data.message || 'Generating zkML proof...',
           progress_pct: lastEvent.data.progress_pct || 50,
         });
+        setProofProgress(prev => ({ ...prev, analyst: lastEvent.data.progress_pct || 50 }));
         break;
 
       case 'ANALYST_RESPONSE':
         setAnalystProofStage(null);
+        setProofProgress(prev => ({ ...prev, analyst: 100 }));
         if (lastEvent.data.proof) {
           setAnalystProof({
             proof_hash: lastEvent.data.proof.proof_hash || '',
@@ -131,6 +139,17 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         if (lastEvent.data.checks) {
           setAnalystVerifyChecks(lastEvent.data.checks);
         }
+        break;
+
+      case 'PAYMENT_SENDING':
+        setCurrentPayment({
+          amount: lastEvent.data.amount_usdc,
+          recipient: lastEvent.data.recipient,
+        });
+        break;
+
+      case 'PAYMENT_SENT':
+        setTimeout(() => setCurrentPayment(null), 2000);
         break;
     }
   }, [lastEvent]);
@@ -177,10 +196,14 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
   const activeFlow = useMemo(() => {
     if (!lastEvent) return null;
 
-    if (lastEvent.type === 'POLICY_REQUESTING') return 'scout-policy';
-    if (lastEvent.type === 'POLICY_RESPONSE') return 'policy-scout';
-    if (lastEvent.type === 'ANALYST_PROCESSING' || lastEvent.type === 'PAYMENT_SENDING') return 'scout-analyst';
-    if (lastEvent.type === 'ANALYST_RESPONSE') return 'analyst-scout';
+    if (lastEvent.type === 'POLICY_REQUESTING' || lastEvent.type === 'PAYMENT_SENDING') {
+      if (lastEvent.data.recipient?.includes('policy')) return 'scout-policy';
+      if (lastEvent.data.recipient?.includes('analyst')) return 'policy-analyst';
+      return 'scout-policy';
+    }
+    if (lastEvent.type === 'POLICY_RESPONSE' || lastEvent.type === 'POLICY_VERIFIED') return 'policy-scout';
+    if (lastEvent.type === 'ANALYST_PROCESSING') return 'policy-analyst';
+    if (lastEvent.type === 'ANALYST_RESPONSE' || lastEvent.type === 'WORK_VERIFIED') return 'analyst-scout';
     return null;
   }, [lastEvent]);
 
@@ -192,7 +215,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       setParticles(prev => [...prev, { id, from, to }]);
       setTimeout(() => {
         setParticles(prev => prev.filter(p => p.id !== id));
-      }, 1500);
+      }, 2000);
     }
   }, [activeFlow, lastEvent?.timestamp]);
 
@@ -219,7 +242,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       case 'POLICY_RESPONSE':
         return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}%)`;
       case 'POLICY_VERIFIED':
-        return `Proof verified ✓`;
+        return `Proof verified`;
       case 'ANALYST_PROCESSING':
         return `Classifying ${event.data.url_count} URLs`;
       case 'ANALYST_PROVING':
@@ -227,7 +250,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       case 'ANALYST_RESPONSE':
         return `${event.data.phishing_count} phishing found`;
       case 'WORK_VERIFIED':
-        return 'Work proof verified ✓';
+        return 'Work proof verified';
       case 'DATABASE_UPDATED':
         return `+${event.data.urls_added} URLs saved`;
       default:
@@ -235,17 +258,180 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     }
   };
 
-  const getGlowClass = (state: AgentState, color: string) => {
-    if (state === 'proving') return `shadow-[0_0_30px_${color},0_0_60px_${color}] animate-pulse`;
-    if (state === 'working') return `shadow-[0_0_20px_${color}]`;
-    if (state === 'active') return `shadow-[0_0_10px_${color}]`;
-    return '';
-  };
-
   return (
     <div className="w-full">
-      {/* Pipeline Container */}
-      <div className="relative flex items-stretch justify-between gap-4">
+      {/* Pipeline Container with SVG Connections */}
+      <div className="relative flex items-stretch justify-between gap-2">
+        {/* SVG Layer for Connection Lines */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          style={{ zIndex: 0 }}
+        >
+          <defs>
+            {/* Gradient for active flow */}
+            <linearGradient id="flowGradientRight" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.2" />
+              <stop offset="50%" stopColor="#fbbf24" stopOpacity="1" />
+              <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.2" />
+            </linearGradient>
+            <linearGradient id="flowGradientLeft" x1="100%" y1="0%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.2" />
+              <stop offset="50%" stopColor="#22d3ee" stopOpacity="1" />
+              <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.2" />
+            </linearGradient>
+            <linearGradient id="paymentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#22c55e" stopOpacity="0.2" />
+              <stop offset="50%" stopColor="#22c55e" stopOpacity="1" />
+              <stop offset="100%" stopColor="#22c55e" stopOpacity="0.2" />
+            </linearGradient>
+            {/* Glow filter */}
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Connection: Scout to Policy */}
+          <g className="connection-scout-policy">
+            <path
+              d="M 25% 50% Q 32% 35% 40% 50%"
+              fill="none"
+              stroke={activeFlow === 'scout-policy' ? 'url(#flowGradientRight)' : activeFlow === 'policy-scout' ? 'url(#flowGradientLeft)' : '#374151'}
+              strokeWidth={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 3 : 2}
+              strokeDasharray={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'none' : '8 4'}
+              className={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'dash-flow' : ''}
+              filter={activeFlow?.includes('policy') && activeFlow?.includes('scout') ? 'url(#glow)' : 'none'}
+            />
+            {/* Animated particles */}
+            {activeFlow === 'scout-policy' && (
+              <>
+                {[0, 1, 2].map(i => (
+                  <circle
+                    key={i}
+                    r="4"
+                    fill="#fbbf24"
+                    filter="url(#glow)"
+                    style={{
+                      offsetPath: "path('M 25% 50% Q 32% 35% 40% 50%')",
+                      offsetRotate: '0deg',
+                    } as any}
+                    className="path-particle"
+                  />
+                ))}
+              </>
+            )}
+            {activeFlow === 'policy-scout' && (
+              <>
+                {[0, 1, 2].map(i => (
+                  <circle
+                    key={i}
+                    r="4"
+                    fill="#22d3ee"
+                    filter="url(#glow)"
+                    style={{
+                      offsetPath: "path('M 40% 50% Q 32% 35% 25% 50%')",
+                      offsetRotate: '0deg',
+                    } as any}
+                    className="path-particle"
+                  />
+                ))}
+              </>
+            )}
+          </g>
+
+          {/* Connection: Policy to Analyst */}
+          <g className="connection-policy-analyst">
+            <path
+              d="M 60% 50% Q 68% 35% 75% 50%"
+              fill="none"
+              stroke={activeFlow === 'policy-analyst' ? 'url(#flowGradientRight)' : activeFlow === 'analyst-scout' ? 'url(#flowGradientLeft)' : '#374151'}
+              strokeWidth={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 3 : 2}
+              strokeDasharray={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'none' : '8 4'}
+              className={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'dash-flow' : ''}
+              filter={activeFlow === 'policy-analyst' || activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
+            />
+            {/* Animated particles */}
+            {activeFlow === 'policy-analyst' && (
+              <>
+                {[0, 1, 2].map(i => (
+                  <circle
+                    key={i}
+                    r="4"
+                    fill="#fbbf24"
+                    filter="url(#glow)"
+                    style={{
+                      offsetPath: "path('M 60% 50% Q 68% 35% 75% 50%')",
+                      offsetRotate: '0deg',
+                    } as any}
+                    className="path-particle"
+                  />
+                ))}
+              </>
+            )}
+            {activeFlow === 'analyst-scout' && (
+              <>
+                {[0, 1, 2].map(i => (
+                  <circle
+                    key={i}
+                    r="4"
+                    fill="#22d3ee"
+                    filter="url(#glow)"
+                    style={{
+                      offsetPath: "path('M 75% 50% Q 68% 35% 60% 50%')",
+                      offsetRotate: '0deg',
+                    } as any}
+                    className="path-particle"
+                  />
+                ))}
+              </>
+            )}
+          </g>
+        </svg>
+
+        {/* Payment Annotation Overlay */}
+        {currentPayment && (
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 float-annotation">
+            <div className="bg-green-500/20 border border-green-500/50 rounded-lg px-3 py-1.5 backdrop-blur-sm">
+              <div className="flex items-center gap-2 text-green-400">
+                <span className="coin-flip">💰</span>
+                <span className="font-mono text-sm font-bold">{currentPayment.amount.toFixed(4)} USDC</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Flow Label Annotations */}
+        {activeFlow === 'scout-policy' && (
+          <div className="absolute top-4 left-[30%] z-10">
+            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
+              Auth Request
+            </span>
+          </div>
+        )}
+        {activeFlow === 'policy-scout' && (
+          <div className="absolute top-4 left-[30%] z-10">
+            <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
+              Authorized + Proof
+            </span>
+          </div>
+        )}
+        {activeFlow === 'policy-analyst' && (
+          <div className="absolute top-4 left-[65%] z-10">
+            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
+              Classify URLs
+            </span>
+          </div>
+        )}
+        {activeFlow === 'analyst-scout' && (
+          <div className="absolute top-4 left-[65%] z-10">
+            <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
+              Results + Proof
+            </span>
+          </div>
+        )}
 
         {/* Scout Agent */}
         <AgentCard
@@ -256,6 +442,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           color="blue"
           colorHex="#3b82f6"
           state={agentStates.scout}
+          proofProgress={0}
           stats={[
             { label: 'URLs Found', value: stats?.total_urls?.toLocaleString() || '0' },
             { label: 'Sources', value: '5' },
@@ -264,17 +451,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           formatEvent={formatEventMessage}
         />
 
-        {/* Flow Arrow: Scout → Policy */}
-        <FlowArrow
-          active={activeFlow === 'scout-policy' || activeFlow === 'policy-scout'}
-          direction={activeFlow === 'policy-scout' ? 'left' : 'right'}
-          particles={particles.filter(p =>
-            (p.from === 'scout' && p.to === 'policy') ||
-            (p.from === 'policy' && p.to === 'scout')
-          )}
-          color={activeFlow === 'policy-scout' ? '#22d3ee' : '#fbbf24'}
-          label="Auth Request"
-        />
+        {/* Spacer for SVG lines */}
+        <div className="w-16" />
 
         {/* Policy Agent */}
         <AgentCard
@@ -285,6 +463,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           color="purple"
           colorHex="#a855f7"
           state={agentStates.policy}
+          proofProgress={agentStates.policy === 'proving' ? proofProgress.policy : 0}
           stats={[
             { label: 'Proofs', value: stats?.total_proofs?.toLocaleString() || '0' },
             { label: 'Earned', value: `$${(stats?.policy_paid_usdc || 0).toFixed(3)}` },
@@ -293,17 +472,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           formatEvent={formatEventMessage}
         />
 
-        {/* Flow Arrow: Scout → Analyst (via Policy approval) */}
-        <FlowArrow
-          active={activeFlow === 'scout-analyst' || activeFlow === 'analyst-scout'}
-          direction={activeFlow === 'analyst-scout' ? 'left' : 'right'}
-          particles={particles.filter(p =>
-            (p.from === 'scout' && p.to === 'analyst') ||
-            (p.from === 'analyst' && p.to === 'scout')
-          )}
-          color={activeFlow === 'analyst-scout' ? '#22d3ee' : '#fbbf24'}
-          label="Classify"
-        />
+        {/* Spacer for SVG lines */}
+        <div className="w-16" />
 
         {/* Analyst Agent */}
         <AgentCard
@@ -314,6 +484,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           color="cyan"
           colorHex="#22d3ee"
           state={agentStates.analyst}
+          proofProgress={agentStates.analyst === 'proving' ? proofProgress.analyst : 0}
           stats={[
             { label: 'Phishing', value: stats?.phishing_count?.toLocaleString() || '0' },
             { label: 'Earned', value: `$${(stats?.analyst_paid_usdc || 0).toFixed(3)}` },
@@ -324,17 +495,17 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       </div>
 
       {/* Flow Legend */}
-      <div className="flex justify-center gap-6 mt-4 text-xs text-gray-500">
+      <div className="flex justify-center gap-6 mt-6 text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-400" />
-          <span>Data/Request</span>
+          <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_8px_#fbbf24]" />
+          <span>Request/Data</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-cyan-400" />
-          <span>Proof/Response</span>
+          <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]" />
+          <span>Response/Proof</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-purple-400" />
+          <div className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#22c55e]" />
           <span>Payment</span>
         </div>
       </div>
@@ -383,7 +554,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
   );
 }
 
-// Agent Card Component
+// Agent Card Component with Progress Ring
 function AgentCard({
   name,
   role,
@@ -392,6 +563,7 @@ function AgentCard({
   color,
   colorHex,
   state,
+  proofProgress,
   stats,
   events,
   formatEvent,
@@ -403,6 +575,7 @@ function AgentCard({
   color: string;
   colorHex: string;
   state: AgentState;
+  proofProgress: number;
   stats: { label: string; value: string }[];
   events: AgentEvent[];
   formatEvent: (e: AgentEvent) => string;
@@ -411,45 +584,94 @@ function AgentCard({
   const isProving = state === 'proving';
   const isWorking = state === 'working';
 
-  const glowStyle = useMemo(() => {
-    if (isProving) return { boxShadow: `0 0 30px ${colorHex}, 0 0 60px ${colorHex}40` };
-    if (isWorking) return { boxShadow: `0 0 20px ${colorHex}80` };
-    if (isActive) return { boxShadow: `0 0 10px ${colorHex}40` };
-    return {};
-  }, [isProving, isWorking, isActive, colorHex]);
+  // Calculate progress ring values
+  const radius = 32;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (proofProgress / 100) * circumference;
 
   return (
     <div
-      className={`flex-1 rounded-xl border bg-gray-900/50 backdrop-blur-sm transition-all duration-300 ${
-        isProving ? 'animate-pulse' : ''
+      className={`flex-1 rounded-xl border bg-gray-900/50 backdrop-blur-sm transition-all duration-500 relative z-10 ${
+        isProving ? 'glow-breathe' : ''
       }`}
       style={{
         borderColor: isActive ? colorHex : '#374151',
-        ...glowStyle,
+        ['--glow-color' as any]: colorHex,
+        boxShadow: isWorking
+          ? `0 0 30px ${colorHex}40`
+          : isActive
+          ? `0 0 15px ${colorHex}20`
+          : 'none',
       }}
     >
+      {/* Ripple rings when proving */}
+      {isProving && (
+        <>
+          <div className="ripple-ring" style={{ ['--glow-color' as any]: colorHex, borderColor: colorHex }} />
+          <div className="ripple-ring" style={{ ['--glow-color' as any]: colorHex, borderColor: colorHex }} />
+          <div className="ripple-ring" style={{ ['--glow-color' as any]: colorHex, borderColor: colorHex }} />
+        </>
+      )}
+
       {/* Header */}
-      <div className={`p-4 border-b border-gray-800 bg-${color}-500/10`}>
+      <div className={`p-4 border-b border-gray-800`} style={{ backgroundColor: `${colorHex}10` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Avatar */}
-            <div
-              className={`w-14 h-14 rounded-full flex items-center justify-center border-2 relative ${
-                isWorking || isProving ? 'animate-spin-slow' : ''
-              }`}
-              style={{
-                borderColor: colorHex,
-                backgroundColor: `${colorHex}20`,
-              }}
-            >
-              <span className="text-2xl">{emoji}</span>
-              {(isWorking || isProving) && (
+            {/* Avatar with Progress Ring */}
+            <div className="relative">
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center border-2 relative ${
+                  isWorking ? 'animate-spin-slow' : ''
+                }`}
+                style={{
+                  borderColor: colorHex,
+                  backgroundColor: `${colorHex}20`,
+                }}
+              >
+                <span className="text-2xl">{emoji}</span>
+              </div>
+
+              {/* Progress Ring SVG */}
+              {isProving && (
+                <svg
+                  className="absolute -inset-1 w-[72px] h-[72px] progress-ring"
+                  viewBox="0 0 72 72"
+                >
+                  {/* Background ring */}
+                  <circle
+                    cx="36"
+                    cy="36"
+                    r={radius}
+                    fill="none"
+                    stroke={`${colorHex}30`}
+                    strokeWidth="4"
+                  />
+                  {/* Progress ring */}
+                  <circle
+                    cx="36"
+                    cy="36"
+                    r={radius}
+                    fill="none"
+                    stroke={colorHex}
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={proofProgress > 0 ? strokeDashoffset : circumference}
+                    className={proofProgress === 0 ? 'progress-ring-indeterminate' : 'transition-all duration-300'}
+                    style={{ filter: `drop-shadow(0 0 6px ${colorHex})` }}
+                  />
+                </svg>
+              )}
+
+              {/* Spinning dashed ring when working */}
+              {isWorking && (
                 <div
-                  className="absolute inset-0 rounded-full border-2 border-dashed animate-spin"
-                  style={{ borderColor: colorHex }}
+                  className="absolute -inset-2 rounded-full border-2 border-dashed animate-spin"
+                  style={{ borderColor: colorHex, animationDuration: '3s' }}
                 />
               )}
             </div>
+
             <div>
               <h3 className="font-bold text-lg" style={{ color: colorHex }}>
                 {name}
@@ -457,11 +679,12 @@ function AgentCard({
               <p className="text-xs text-gray-500">{role}</p>
             </div>
           </div>
+
           {/* Status Badge */}
           <div
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
+            className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
               isProving
-                ? 'bg-yellow-500/20 text-yellow-400 animate-pulse'
+                ? 'bg-yellow-500/20 text-yellow-400'
                 : isWorking
                 ? 'bg-green-500/20 text-green-400'
                 : isActive
@@ -469,7 +692,21 @@ function AgentCard({
                 : 'bg-gray-700/50 text-gray-500'
             }`}
           >
-            {isProving ? '🔐 PROVING' : isWorking ? '⚡ WORKING' : isActive ? '● ACTIVE' : '○ IDLE'}
+            {isProving && (
+              <span className="w-2 h-2 rounded-full bg-yellow-400 status-active" />
+            )}
+            {isWorking && (
+              <span className="w-2 h-2 rounded-full bg-green-400 status-active" />
+            )}
+            {isActive && !isProving && !isWorking && (
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
+            )}
+            {!isActive && (
+              <span className="w-2 h-2 rounded-full bg-gray-500" />
+            )}
+            <span>
+              {isProving ? 'PROVING' : isWorking ? 'WORKING' : isActive ? 'ACTIVE' : 'IDLE'}
+            </span>
           </div>
         </div>
       </div>
@@ -501,72 +738,16 @@ function AgentCard({
                 <span className="text-gray-600 text-xs mt-0.5">
                   {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
-                <span className={i === 0 ? 'animate-pulse' : ''}>{formatEvent(event)}</span>
+                <span className={i === 0 ? 'animate-pulse' : ''}>
+                  {formatEvent(event)}
+                  {i === 0 && event.type.includes('VERIFIED') && (
+                    <span className="ml-1 text-green-400">✓</span>
+                  )}
+                </span>
               </div>
             ))
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-// Flow Arrow Component
-function FlowArrow({
-  active,
-  direction,
-  particles,
-  color,
-  label,
-}: {
-  active: boolean;
-  direction: 'left' | 'right';
-  particles: { id: number; from: string; to: string }[];
-  color: string;
-  label: string;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center w-20 relative">
-      {/* Label */}
-      <span className="text-xs text-gray-600 mb-2">{label}</span>
-
-      {/* Arrow Line */}
-      <div className="relative w-full h-8 flex items-center">
-        <div
-          className={`h-0.5 w-full transition-all duration-300 ${
-            active ? '' : 'opacity-30'
-          }`}
-          style={{
-            background: active
-              ? `linear-gradient(${direction === 'right' ? '90deg' : '270deg'}, transparent, ${color}, transparent)`
-              : '#374151',
-          }}
-        />
-
-        {/* Arrow Head */}
-        <ArrowRight
-          size={16}
-          className={`absolute transition-all duration-300 ${
-            direction === 'left' ? 'left-0 rotate-180' : 'right-0'
-          }`}
-          style={{
-            color: active ? color : '#374151',
-            filter: active ? `drop-shadow(0 0 4px ${color})` : 'none',
-          }}
-        />
-
-        {/* Particles */}
-        {particles.map((p) => (
-          <div
-            key={p.id}
-            className="absolute w-2 h-2 rounded-full animate-flow-particle"
-            style={{
-              backgroundColor: color,
-              boxShadow: `0 0 8px ${color}`,
-              animationDirection: direction === 'left' ? 'reverse' : 'normal',
-            }}
-          />
-        ))}
       </div>
     </div>
   );

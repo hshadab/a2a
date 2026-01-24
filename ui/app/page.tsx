@@ -24,6 +24,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import AgentPipeline from '@/components/AgentPipeline';
+import TreasuryWidget from '@/components/TreasuryWidget';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 
@@ -88,10 +89,10 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
               <Shield className="text-cyber-blue" />
-              Threat Intelligence Network
+              ThreatProof
             </h1>
             <p className="text-gray-400 mt-1">
-              A2A + x402 + Jolt Atlas zkML
+              Verifiable Threat Intelligence | A2A + x402 + zkML
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -118,6 +119,11 @@ export default function Dashboard() {
               Trigger Batch
             </button>
           </div>
+        </div>
+
+        {/* Treasury Widget */}
+        <div className="mt-4">
+          <TreasuryWidget />
         </div>
       </header>
 
