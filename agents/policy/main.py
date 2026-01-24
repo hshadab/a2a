@@ -290,8 +290,8 @@ async def debug_prover():
             cmd = [zkml_path, model_path] + test_inputs
             proc = subprocess.run(cmd, capture_output=True, timeout=30)
             result["test_returncode"] = proc.returncode
-            result["test_stdout"] = proc.stdout.decode()[:1000]
-            result["test_stderr"] = proc.stderr.decode()[:1000]
+            result["test_stdout"] = proc.stdout.decode()[-2000:]  # Last 2000 chars
+            result["test_stderr"] = proc.stderr.decode()[-2000:]  # Last 2000 chars
         except Exception as e:
             result["test_error"] = str(e)
 
