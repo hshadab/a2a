@@ -285,13 +285,15 @@ async def debug_prover():
     # Try to run the binary with minimal args to see what happens
     if result["zkml_exists"] and result["model_exists"]:
         try:
-            # Test run with 8 inputs (authorization model expects 64 but let's see the error)
-            test_inputs = ["1000"] * 64
+            # Test run with proper scaled inputs (0-65536 range for fixed point)
+            test_inputs = ["32768"] * 64  # Mid-range values
             cmd = [zkml_path, model_path] + test_inputs
-            proc = subprocess.run(cmd, capture_output=True, timeout=30)
+            proc = subprocess.run(cmd, capture_output=True, timeout=120)
             result["test_returncode"] = proc.returncode
-            result["test_stdout"] = proc.stdout.decode()[-2000:]  # Last 2000 chars
-            result["test_stderr"] = proc.stderr.decode()[-2000:]  # Last 2000 chars
+            result["test_stdout_full"] = proc.stdout.decode()
+            result["test_stderr_last"] = proc.stderr.decode()[-3000:]  # Last 3000 chars of stderr
+            result["test_stdout_len"] = len(proc.stdout)
+            result["test_stderr_len"] = len(proc.stderr)
         except Exception as e:
             result["test_error"] = str(e)
 
