@@ -32,9 +32,13 @@ class Config:
     scout_interval_seconds: int = 300  # 5 minutes
     scout_batch_size: int = 50
 
-    # Jolt Atlas paths
+    # Jolt Atlas paths - use jolt subdirectory models for zkML proof generation
     jolt_atlas_path: str = os.getenv("JOLT_ATLAS_PATH", "./jolt-atlas")
-    authorization_model_path: str = os.getenv("AUTH_MODEL_PATH", "./agents/policy/models/authorization.onnx")
+    jolt_model_dir: str = os.getenv("JOLT_MODEL_DIR", "./agents/policy/models/jolt")
+    authorization_model_path: str = os.getenv(
+        "AUTH_MODEL_PATH",
+        os.path.join(os.getenv("JOLT_MODEL_DIR", "./agents/policy/models/jolt"), "network.onnx")
+    )
     classifier_model_path: str = os.getenv("CLASSIFIER_MODEL_PATH", "./agents/analyst/models/url_classifier.onnx")
 
     # WebSocket for UI
