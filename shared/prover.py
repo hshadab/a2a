@@ -156,35 +156,74 @@ class JoltAtlasProver:
 
     def _scale_inputs_to_integers(self, inputs: List[float], model_name: str) -> List[int]:
         """
-        Scale float inputs to integers for the Jolt prover.
+        Convert float inputs to one-hot encoded integers for the Jolt prover.
 
-        The Jolt prover works with fixed-point arithmetic, so we need to
-        scale floating point values to integers.
+        The authorization model expects one-hot encoded inputs with 64 dimensions:
+        - budget: 16 buckets (indices 0-15)
+        - trust: 8 buckets (indices 16-23)
+        - amount: 16 buckets (indices 24-39)
+        - category: 4 buckets (indices 40-43)
+        - velocity: 8 buckets (indices 44-51)
+        - day: 8 buckets (indices 52-59)
+        - time: 4 buckets (indices 60-63)
         """
-        # Scale factor for fixed-point representation (2^16 for good precision)
-        SCALE = 65536
-
         if "authorization" in model_name.lower():
-            # For authorization, inputs are already normalized 0-1
-            # Scale to integer range expected by the model
-            int_inputs = []
-            for i, val in enumerate(inputs[:64]):  # Authorization uses 64 features
-                # Clamp to 0-1 range and scale
-                clamped = max(0.0, min(1.0, val))
-                scaled = int(clamped * SCALE)
-                int_inputs.append(scaled)
-            # Pad to 64 if needed
-            while len(int_inputs) < 64:
-                int_inputs.append(0)
-            return int_inputs
+            # Authorization model uses one-hot encoding across 64 dimensions
+            # Input order from prove_authorization:
+            # [batch_size_norm, budget_norm, cost_norm, reputation, novelty, time_norm, threat, cost_ratio]
+
+            one_hot = [0] * 64
+
+            # Feature bucket sizes and offsets
+            buckets = [
+                ("budget", 16, 0),     # indices 0-15: budget level
+                ("trust", 8, 16),       # indices 16-23: trust/reputation
+                ("amount", 16, 24),     # indices 24-39: cost/amount level
+                ("category", 4, 40),    # indices 40-43: category (use threat level)
+                ("velocity", 8, 44),    # indices 44-51: velocity (use batch size)
+                ("day", 8, 52),         # indices 52-59: time context
+                ("time", 4, 60),        # indices 60-63: time of day
+            ]
+
+            # Map normalized inputs to bucket indices
+            if len(inputs) >= 8:
+                # budget: inputs[1] is budget_remaining / 10000
+                budget_idx = min(15, int(inputs[1] * 16))
+                one_hot[budget_idx] = 1
+
+                # trust: inputs[3] is source_reputation (0-1)
+                trust_idx = 16 + min(7, int(inputs[3] * 8))
+                one_hot[trust_idx] = 1
+
+                # amount: inputs[2] is estimated_cost / 100
+                amount_idx = 24 + min(15, int(inputs[2] * 16))
+                one_hot[amount_idx] = 1
+
+                # category: use threat_level as category proxy
+                category_idx = 40 + min(3, int(inputs[6] * 4))
+                one_hot[category_idx] = 1
+
+                # velocity: use batch_size as velocity proxy
+                velocity_idx = 44 + min(7, int(inputs[0] * 8))
+                one_hot[velocity_idx] = 1
+
+                # day: use time_since_last as time context
+                day_idx = 52 + min(7, int(inputs[5] * 8))
+                one_hot[day_idx] = 1
+
+                # time: use novelty as time bucket
+                time_idx = 60 + min(3, int(inputs[4] * 4))
+                one_hot[time_idx] = 1
+
+            return one_hot
         else:
-            # For URL classifier, similar scaling
+            # For URL classifier, use standard scaling
+            SCALE = 65536
             int_inputs = []
-            for val in inputs[:32]:  # Classifier uses 32 features
+            for val in inputs[:32]:
                 clamped = max(0.0, min(1.0, val))
                 scaled = int(clamped * SCALE)
                 int_inputs.append(scaled)
-            # Pad to 32 if needed
             while len(int_inputs) < 32:
                 int_inputs.append(0)
             return int_inputs
