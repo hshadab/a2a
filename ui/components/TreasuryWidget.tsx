@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Wallet, Fuel, TrendingUp, ExternalLink } from 'lucide-react';
+import { Wallet, Fuel, TrendingUp, ExternalLink, Clock } from 'lucide-react';
 
 interface TreasuryWidgetProps {
   treasuryAddress?: string;
@@ -165,14 +165,19 @@ export default function TreasuryWidget({
         </a>
       </div>
 
-      {/* Self-sustaining indicator */}
-      <div className="mt-2 flex items-center gap-2 text-[10px]">
+      {/* Status indicators */}
+      <div className="mt-2 flex items-center gap-3 text-[10px]">
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-green-400">Self-sustaining economy</span>
+          <span className="text-green-400">Self-sustaining</span>
         </div>
-        <span className="text-gray-600">|</span>
-        <span className="text-gray-500">USDC circulates internally, only gas is consumed</span>
+        <span className="text-gray-700">|</span>
+        <div className="flex items-center gap-1">
+          <Clock size={10} className="text-cyan-400" />
+          <span className="text-cyan-400">Batches every 5 min</span>
+        </div>
+        <span className="text-gray-700">|</span>
+        <span className="text-gray-500">USDC circulates internally, only gas consumed</span>
       </div>
     </div>
   );

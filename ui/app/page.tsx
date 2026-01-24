@@ -5,7 +5,6 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import {
   getNetworkStats,
   getHealthStatus,
-  triggerBatch,
   formatUSDC,
   formatNumber,
   formatDuration,
@@ -21,7 +20,7 @@ import {
   DollarSign,
   AlertTriangle,
   CheckCircle,
-  RefreshCw,
+  Cpu,
 } from 'lucide-react';
 import AgentPipeline from '@/components/AgentPipeline';
 import TreasuryWidget from '@/components/TreasuryWidget';
@@ -73,14 +72,6 @@ export default function Dashboard() {
     }
   }, [lastEvent]);
 
-  const handleTrigger = async () => {
-    try {
-      await triggerBatch();
-    } catch (e) {
-      console.error('Failed to trigger batch:', e);
-    }
-  };
-
   return (
     <div className="min-h-screen p-6">
       {/* Header */}
@@ -96,6 +87,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {/* WebSocket Connection Status */}
             <div className="flex items-center gap-2">
               <div
                 className={`w-3 h-3 rounded-full ${
@@ -106,18 +98,19 @@ export default function Dashboard() {
                 {isConnected ? 'Live' : 'Disconnected'}
               </span>
             </div>
+
+            {/* Autonomous Mode Indicator */}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+              <Cpu size={14} className="text-cyan-400 animate-pulse" />
+              <span className="text-sm text-cyan-400">Autonomous</span>
+            </div>
+
+            {/* Running Time */}
             {stats?.running_since && (
               <div className="text-sm text-gray-400">
-                Running: {formatDuration(stats.running_since)}
+                Uptime: {formatDuration(stats.running_since)}
               </div>
             )}
-            <button
-              onClick={handleTrigger}
-              className="px-4 py-2 bg-cyber-blue/20 border border-cyber-blue text-cyber-blue rounded-lg hover:bg-cyber-blue/30 transition-colors flex items-center gap-2"
-            >
-              <RefreshCw size={16} />
-              Trigger Batch
-            </button>
           </div>
         </div>
 
