@@ -282,8 +282,8 @@ async def debug_prover():
         "model_exists": os.path.isfile(model_path) if model_path else False,
     }
 
-    # Test with multiclass0 model (known to work with small tensors)
-    multiclass_model = "/opt/render/project/src/jolt-atlas/onnx-tracer/models/multiclass0/network.onnx"
+    # Test with simple_test.onnx (multiclass0 model, known to work with small tensors)
+    multiclass_model = "/opt/render/project/src/agents/policy/models/jolt/simple_test.onnx"
     if result["zkml_exists"]:
         result["multiclass_model_exists"] = os.path.isfile(multiclass_model)
 
