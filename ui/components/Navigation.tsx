@@ -83,19 +83,25 @@ export default function Navigation() {
 
   return (
     <nav className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-6">
         {/* Top Row: Logo, Title, Status */}
-        <div className="flex items-center justify-between h-12 border-b border-gray-800/50">
+        <div className="flex items-center justify-between h-16 border-b border-gray-800/50">
           {/* Logo & Title */}
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2">
-              <Shield className="text-cyan-400" size={22} />
-              <span className="text-lg font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+          <div className="flex items-center gap-4">
+            <Link href="/" className="flex items-center gap-3">
+              {/* Novanet Logo */}
+              <img
+                src="https://cdn.prod.website-files.com/65d52b07d5bc41614daa723f/665df12739c532f45b665fe7_logo-novanet.svg"
+                alt="Novanet"
+                className="h-8 w-auto"
+              />
+              <span className="text-gray-600 text-xl">|</span>
+              <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 ThreatProof
               </span>
             </Link>
-            <span className="text-gray-600">|</span>
-            <span className="text-xs text-gray-400">
+            <span className="text-gray-600 text-lg">|</span>
+            <span className="text-sm text-gray-400">
               <span className="text-cyan-400">Google A2A</span>
               {' + '}
               <span className="text-green-400">x402</span>
@@ -112,17 +118,17 @@ export default function Navigation() {
           </div>
 
           {/* Status Indicators */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs text-green-400">Live</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm text-green-400 font-medium">Live</span>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-cyan-500/10 border border-cyan-500/30 rounded">
-              <Cpu size={12} className="text-cyan-400" />
-              <span className="text-xs text-cyan-400">Autonomous</span>
+            <div className="flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+              <Cpu size={14} className="text-cyan-400" />
+              <span className="text-sm text-cyan-400 font-medium">Autonomous</span>
             </div>
             {/* Tabs */}
-            <div className="flex items-center gap-1 ml-2">
+            <div className="flex items-center gap-2 ml-3">
               {tabs.map((tab) => {
                 const isActive = pathname === tab.href;
                 const Icon = tab.icon;
@@ -130,13 +136,13 @@ export default function Navigation() {
                   <Link
                     key={tab.href}
                     href={tab.href}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-all ${
+                    className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
                       isActive
                         ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
                         : 'text-gray-400 hover:text-white hover:bg-gray-800'
                     }`}
                   >
-                    <Icon size={14} />
+                    <Icon size={16} />
                     {tab.label}
                   </Link>
                 );
@@ -146,61 +152,61 @@ export default function Navigation() {
         </div>
 
         {/* Bottom Row: Treasury Stats */}
-        <div className="flex items-center justify-between h-10">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between h-12">
+          <div className="flex items-center gap-5">
             {/* USDC Balance */}
             <div className="flex items-center gap-2">
-              <span className="text-sm">💵</span>
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-gray-500 uppercase">Treasury</span>
-                <span className="text-sm text-green-400 font-mono font-bold">
+              <span className="text-lg">💵</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500 uppercase">Treasury</span>
+                <span className="text-base text-green-400 font-mono font-bold">
                   {loading ? '...' : `${balance?.usdcFormatted} USDC`}
                 </span>
               </div>
             </div>
 
-            <span className="text-gray-700">|</span>
+            <span className="text-gray-700 text-lg">|</span>
 
             {/* ETH Balance */}
             <div className="flex items-center gap-2">
-              <Fuel size={14} className="text-blue-400" />
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-gray-500 uppercase">Gas</span>
-                <span className="text-sm text-blue-400 font-mono font-bold">
+              <Fuel size={18} className="text-blue-400" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500 uppercase">Gas</span>
+                <span className="text-base text-blue-400 font-mono font-bold">
                   {loading ? '...' : `${balance?.ethFormatted} ETH`}
                 </span>
               </div>
             </div>
 
-            <span className="text-gray-700">|</span>
+            <span className="text-gray-700 text-lg">|</span>
 
             {/* Runway */}
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-gray-500 uppercase">Runway</span>
-              <span className="text-sm text-purple-400 font-mono font-bold">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500 uppercase">Runway</span>
+              <span className="text-base text-purple-400 font-mono font-bold">
                 {loading ? '...' : `~${estimatedBatches.toLocaleString()} batches`}
               </span>
             </div>
 
-            <span className="text-gray-700">|</span>
+            <span className="text-gray-700 text-lg">|</span>
 
             {/* Basescan Link */}
             <a
               href={`https://basescan.org/address/${TREASURY_ADDRESS}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300"
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300"
             >
-              <Wallet size={12} />
+              <Wallet size={14} />
               <span className="font-mono">{shortAddress}</span>
-              <ExternalLink size={10} />
+              <ExternalLink size={12} />
             </a>
           </div>
 
           {/* Economy info */}
-          <div className="flex items-center gap-2 text-[10px] text-gray-500">
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
               Self-sustaining
             </span>
             <span className="text-gray-700">|</span>
