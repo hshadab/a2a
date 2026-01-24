@@ -391,8 +391,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
         {/* Scout Agent */}
         <AgentCard
-          name="Scout"
-          role="Explorer"
+          name="Threat Scout"
+          role="URL Discovery"
           icon={<Activity size={24} />}
           emoji="🔭"
           color="blue"
@@ -401,7 +401,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           proofProgress={0}
           stats={[
             { label: 'URLs Found', value: stats?.total_urls?.toLocaleString() || '0' },
-            { label: 'Sources', value: '5' },
+            { label: 'Sources', value: '4' },
           ]}
           events={getAgentEvents('scout')}
           formatEvent={formatEventMessage}
@@ -412,8 +412,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
         {/* Policy Agent */}
         <AgentCard
-          name="Policy"
-          role="Gatekeeper"
+          name="Spending Policy"
+          role="Budget Authorization"
           icon={<Shield size={24} />}
           emoji="⚖️"
           color="purple"
@@ -433,8 +433,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
         {/* Analyst Agent */}
         <AgentCard
-          name="Analyst"
-          role="Detective"
+          name="URL Classifier"
+          role="Threat Analysis"
           icon={<Zap size={24} />}
           emoji="🔬"
           color="cyan"

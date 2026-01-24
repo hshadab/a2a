@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Info, Shield, Fuel, Wallet, ExternalLink, Cpu } from 'lucide-react';
+import { Activity, Info, Shield, Fuel, Wallet, ExternalLink, Cpu, History } from 'lucide-react';
 
 interface Balance {
   usdc: number;
@@ -21,6 +21,7 @@ export default function Navigation() {
 
   const tabs = [
     { href: '/', label: 'Dashboard', icon: Activity },
+    { href: '/history', label: 'History', icon: History },
     { href: '/about', label: 'About', icon: Info },
   ];
 
@@ -85,7 +86,7 @@ export default function Navigation() {
     <nav className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6">
         {/* Top Row: Logo, Title, Status */}
-        <div className="flex items-center justify-between h-16 border-b border-gray-800/50">
+        <div className="flex items-center justify-between h-20 border-b border-gray-800/50">
           {/* Logo & Title */}
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-3">
@@ -152,7 +153,7 @@ export default function Navigation() {
         </div>
 
         {/* Bottom Row: Treasury Stats */}
-        <div className="flex items-center justify-between h-12">
+        <div className="flex items-center justify-between h-14">
           <div className="flex items-center gap-5">
             {/* USDC Balance */}
             <div className="flex items-center gap-2">

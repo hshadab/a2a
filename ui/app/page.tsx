@@ -71,7 +71,7 @@ export default function Dashboard() {
   }, [lastEvent]);
 
   return (
-    <div className="min-h-screen p-6 pt-4">
+    <div className="min-h-screen p-6 pt-8">
       {/* Agent Pipeline Visualization */}
       <section className="mb-8">
         <AgentPipeline

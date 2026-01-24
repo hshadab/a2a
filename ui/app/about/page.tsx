@@ -32,22 +32,22 @@ export default function AboutPage() {
         <div className="grid grid-cols-3 gap-6 mb-8">
           <AgentBox
             emoji="🔭"
-            name="Scout Agent"
-            role="Explorer"
+            name="Threat Scout"
+            role="URL Discovery"
             color="#3b82f6"
-            description="Continuously monitors threat feeds (PhishTank, OpenPhish, Certificate Transparency logs) to discover suspicious URLs."
+            description="Proactively discovers threats via typosquatting detection, Certificate Transparency monitoring, and threat feed aggregation."
           />
           <AgentBox
             emoji="⚖️"
-            name="Policy Agent"
-            role="Gatekeeper"
+            name="Spending Policy"
+            role="Budget Authorization"
             color="#a855f7"
-            description="Evaluates whether to authorize spending on classification. Generates zkML proofs of its decision logic."
+            description="Authorizes spending on URL classification. Generates zkML proofs that the budget decision followed the policy rules."
           />
           <AgentBox
             emoji="🔬"
-            name="Analyst Agent"
-            role="Detective"
+            name="URL Classifier"
+            role="Threat Analysis"
             color="#22d3ee"
             description="Classifies URLs as phishing/safe using ML. Generates zkML proofs that the classification was computed correctly."
           />
