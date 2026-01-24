@@ -118,6 +118,14 @@ class InMemoryDatabase:
                     similar.append(stats)
         return similar[:limit]
 
+    async def get_domain_similarity(self, domain1: str, domain2: str) -> float:
+        """
+        Calculate simple similarity between two domains.
+        Uses basic string comparison for in-memory mode.
+        """
+        from difflib import SequenceMatcher
+        return SequenceMatcher(None, domain1.lower(), domain2.lower()).ratio()
+
     async def update_registrar_stats(self, registrar: str, is_phishing: bool):
         if registrar not in self.registrar_stats:
             self.registrar_stats[registrar] = RegistrarStats(
@@ -457,6 +465,26 @@ class Database:
                 LIMIT $2
             """, domain, limit)
             return [DomainStats(**dict(row)) for row in rows]
+
+    async def get_domain_similarity(self, domain1: str, domain2: str) -> float:
+        """
+        Calculate the similarity between two domains using PostgreSQL's pg_trgm.
+
+        Args:
+            domain1: First domain
+            domain2: Second domain
+
+        Returns:
+            Similarity score between 0 and 1
+        """
+        if self._demo_mode:
+            return await self._in_memory.get_domain_similarity(domain1, domain2)
+        async with self.acquire() as conn:
+            result = await conn.fetchval(
+                "SELECT similarity($1, $2)",
+                domain1, domain2
+            )
+            return float(result) if result else 0.0
 
     async def update_registrar_stats(self, registrar: str, is_phishing: bool):
         if self._demo_mode:

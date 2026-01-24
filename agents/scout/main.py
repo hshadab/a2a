@@ -42,8 +42,10 @@ from shared.prover import authorization_prover, classifier_prover
 
 from sources import (
     PhishTankSource, OpenPhishSource, URLhausSource,
-    SyntheticSource, AlexaTopSource
+    SyntheticSource, AlexaTopSource,
+    CertTransparencySource, TwitterSource, PasteSiteSource
 )
+from shared.reputation import reputation_manager
 
 
 # ============ Scout Agent ============
@@ -61,12 +63,25 @@ class ScoutAgent:
     """
 
     def __init__(self):
+        # Build sources list based on configuration
         self.sources = [
             SyntheticSource(phishing_ratio=0.35),  # For demo
             # PhishTankSource(),  # Enable when API key available
             # OpenPhishSource(),
             # URLhausSource(),
         ]
+
+        # Add Certificate Transparency source if enabled
+        if config.enable_ct_source:
+            self.sources.append(CertTransparencySource(lookback_days=1))
+
+        # Add Twitter source if enabled and configured
+        if config.enable_twitter_source and config.twitter_bearer_token:
+            self.sources.append(TwitterSource(bearer_token=config.twitter_bearer_token))
+
+        # Add paste site source if enabled
+        if config.enable_paste_source:
+            self.sources.append(PasteSiteSource())
 
         self.a2a_client = A2AClient()
         self.x402_client = X402Client()
@@ -245,7 +260,12 @@ class ScoutAgent:
                     # Filter out already classified
                     novel_urls = await db.filter_novel_urls(urls)
                     if novel_urls:
-                        return novel_urls, source.name, source.reputation
+                        # Use dynamic reputation if enabled
+                        if config.enable_dynamic_reputation:
+                            reputation = reputation_manager.get_reputation(source.name)
+                        else:
+                            reputation = source.reputation
+                        return novel_urls, source.name, reputation
             except (ConnectionError, TimeoutError) as e:
                 logger.warning(f"Network error fetching from {source.name}: {e}")
                 source.record_error()
@@ -425,6 +445,15 @@ class ScoutAgent:
         analyst_paid: float
     ):
         """Store classification results in database"""
+        # Import clustering lazily to avoid circular imports
+        if config.enable_clustering:
+            try:
+                from agents.analyst.clustering import campaign_clusterer
+            except ImportError:
+                campaign_clusterer = None
+        else:
+            campaign_clusterer = None
+
         records = []
         per_url_payment = analyst_paid / len(results) if results else 0
 
@@ -448,6 +477,29 @@ class ScoutAgent:
             records.append(record)
 
         await db.insert_classifications_batch(records)
+
+        # Campaign clustering for phishing domains
+        if campaign_clusterer:
+            for record in records:
+                try:
+                    campaign = await campaign_clusterer.cluster_domain(record)
+                    if campaign:
+                        logger.debug(f"Domain {record.domain} clustered into campaign {campaign.name}")
+                except Exception as e:
+                    logger.warning(f"Error clustering domain {record.domain}: {e}")
+
+        # Update reputation tracking
+        if config.enable_dynamic_reputation:
+            for record in records:
+                try:
+                    await reputation_manager.record_classification(
+                        source_name=source,
+                        url=record.url,
+                        predicted=record.classification.value,
+                        confidence=record.confidence,
+                    )
+                except Exception as e:
+                    logger.warning(f"Error recording reputation for {record.url}: {e}")
 
     def _extract_domain(self, url: str) -> str:
         """Extract domain from URL"""

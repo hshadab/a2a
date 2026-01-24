@@ -6,6 +6,9 @@ from .phishtank import PhishTankSource
 from .openphish import OpenPhishSource
 from .urlhaus import URLhausSource
 from .synthetic import SyntheticSource, AlexaTopSource
+from .crtsh import CertTransparencySource
+from .twitter import TwitterSource
+from .pastebin import PasteSiteSource
 
 __all__ = [
     'URLSource',
@@ -14,4 +17,7 @@ __all__ = [
     'URLhausSource',
     'SyntheticSource',
     'AlexaTopSource',
+    'CertTransparencySource',
+    'TwitterSource',
+    'PasteSiteSource',
 ]

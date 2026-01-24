@@ -52,5 +52,20 @@ class Config:
     # Redis for coordination
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
 
+    # Twitter/X API (for TwitterSource)
+    twitter_bearer_token: Optional[str] = os.getenv("TWITTER_BEARER_TOKEN")
+
+    # Feature flags for sources
+    enable_ct_source: bool = os.getenv("ENABLE_CT_SOURCE", "true").lower() == "true"
+    enable_twitter_source: bool = os.getenv("ENABLE_TWITTER_SOURCE", "false").lower() == "true"
+    enable_paste_source: bool = os.getenv("ENABLE_PASTE_SOURCE", "false").lower() == "true"
+
+    # Campaign clustering settings
+    enable_clustering: bool = os.getenv("ENABLE_CLUSTERING", "true").lower() == "true"
+    clustering_similarity_threshold: float = float(os.getenv("CLUSTERING_THRESHOLD", "0.6"))
+
+    # Dynamic reputation settings
+    enable_dynamic_reputation: bool = os.getenv("ENABLE_DYNAMIC_REPUTATION", "true").lower() == "true"
+
 
 config = Config()
