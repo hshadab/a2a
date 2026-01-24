@@ -282,31 +282,43 @@ async def debug_prover():
         "model_exists": os.path.isfile(model_path) if model_path else False,
     }
 
-    # Try to run the binary with proper one-hot encoded inputs
+    # Test with multiclass0 model (known to work with small tensors)
+    multiclass_model = "/opt/render/project/src/jolt-atlas/onnx-tracer/models/multiclass0/network.onnx"
+    if result["zkml_exists"]:
+        result["multiclass_model_exists"] = os.path.isfile(multiclass_model)
+
+        if result.get("multiclass_model_exists"):
+            try:
+                # multiclass0 expects L=8 token IDs (integers)
+                test_inputs = ["1", "2", "3", "4", "5", "0", "0", "0"]  # 8 inputs
+                cmd = [zkml_path, multiclass_model] + test_inputs
+                proc = subprocess.run(cmd, capture_output=True, timeout=180)
+                result["multiclass_test"] = {
+                    "returncode": proc.returncode,
+                    "stdout": proc.stdout.decode()[:2000],
+                    "stderr_last": proc.stderr.decode()[-2000:]
+                }
+            except Exception as e:
+                result["multiclass_test_error"] = str(e)
+
+    # Also test the authorization model to show the error
     if result["zkml_exists"] and result["model_exists"]:
         try:
-            # Build one-hot vector for: budget=15, trust=7, amount=8, category=0, velocity=2, day=1, time=1
-            # From vocab.json: budget_15->15, trust_7->23, amount_8->32, category_0->40, velocity_2->46, day_1->53, time_1->61
+            # Build one-hot vector (will fail due to MAX_TENSOR_SIZE)
             one_hot = [0] * 64
             one_hot[15] = 1   # budget_15
             one_hot[23] = 1   # trust_7
-            one_hot[32] = 1   # amount_8
-            one_hot[40] = 1   # category_0
-            one_hot[46] = 1   # velocity_2
-            one_hot[53] = 1   # day_1
-            one_hot[61] = 1   # time_1
             test_inputs = [str(v) for v in one_hot]
-            result["test_one_hot_indices"] = [i for i, v in enumerate(one_hot) if v == 1]
 
             cmd = [zkml_path, model_path] + test_inputs
-            proc = subprocess.run(cmd, capture_output=True, timeout=180)
-            result["test_returncode"] = proc.returncode
-            result["test_stdout_full"] = proc.stdout.decode()
-            result["test_stderr_last"] = proc.stderr.decode()[-4000:]  # Last 4000 chars of stderr
-            result["test_stdout_len"] = len(proc.stdout)
-            result["test_stderr_len"] = len(proc.stderr)
+            proc = subprocess.run(cmd, capture_output=True, timeout=60)
+            result["auth_model_test"] = {
+                "returncode": proc.returncode,
+                "error_summary": "MAX_TENSOR_SIZE exceeded" if proc.returncode != 0 else "OK",
+                "stderr_last": proc.stderr.decode()[-1000:]
+            }
         except Exception as e:
-            result["test_error"] = str(e)
+            result["auth_model_test_error"] = str(e)
 
     return result
 

@@ -26,9 +26,11 @@ random.seed(42)
 
 # --------------------------
 # Configuration (Power-of-2 dimensions for SNARK compatibility)
+# Max tensor size is 1024 in the prover, so largest weight matrix must be <= 1024
+# With 64 inputs, max hidden size is 16 (64*16=1024)
 # --------------------------
 INPUT_SIZE = 64     # Power of 2 for one-hot encoded features
-HIDDEN_SIZE = 32    # Power of 2, smaller than article classification
+HIDDEN_SIZE = 16    # Reduced from 32 to fit within prover's MAX_TENSOR_SIZE=1024
 NUM_CLASSES = 4     # Power of 2 (2 real classes: authorized/denied + 2 padding)
 BATCH_SIZE = 32
 EPOCHS = 50
@@ -54,26 +56,24 @@ assert TOTAL_FEATURES == INPUT_SIZE, f"Feature dimensions don't match INPUT_SIZE
 class MLPAuthorizationClassifier(nn.Module):
     """
     MLP classifier for authorization decisions with power-of-two dimensions.
-    Architecture follows article classification pattern:
-    Input -> Linear(64->32) -> ReLU -> Linear(32->16) -> ReLU -> Linear(16->4)
-    No sigmoid - outputs raw logits for classification.
+    Simplified 2-layer architecture to fit within prover's MAX_TENSOR_SIZE=1024:
+    Input -> Linear(64->16) -> ReLU -> Linear(16->4)
+    Weight matrices: 64*16=1024 and 16*4=64, both within limits.
     """
     def __init__(self, input_size=INPUT_SIZE, hidden_size=HIDDEN_SIZE, num_classes=NUM_CLASSES):
         super(MLPAuthorizationClassifier, self).__init__()
-        
+
         # All dimensions are powers of 2 for SNARK efficiency
-        self.fc1 = nn.Linear(input_size, hidden_size)           # 64 -> 32
-        self.fc2 = nn.Linear(hidden_size, hidden_size // 2)     # 32 -> 16  
-        self.fc3 = nn.Linear(hidden_size // 2, num_classes)     # 16 -> 4
+        # Max weight matrix: 64*16 = 1024 (exactly at MAX_TENSOR_SIZE limit)
+        self.fc1 = nn.Linear(input_size, hidden_size)           # 64 -> 16
+        self.fc2 = nn.Linear(hidden_size, num_classes)          # 16 -> 4
         self.relu = nn.ReLU()
-        
+
     def forward(self, x):
         # Input: [batch_size, 64] - one-hot encoded features
-        x = self.fc1(x)           # [batch_size, 32]
-        x = self.relu(x)          # [batch_size, 32]
-        x = self.fc2(x)           # [batch_size, 16]
+        x = self.fc1(x)           # [batch_size, 16]
         x = self.relu(x)          # [batch_size, 16]
-        x = self.fc3(x)           # [batch_size, 4] - raw logits
+        x = self.fc2(x)           # [batch_size, 4] - raw logits
         return x
 
 
@@ -515,9 +515,7 @@ def save_metadata(vocab_mapping, feature_mapping, model_stats):
             "layers": [
                 {"type": "Linear", "in_features": INPUT_SIZE, "out_features": HIDDEN_SIZE},
                 {"type": "ReLU"},
-                {"type": "Linear", "in_features": HIDDEN_SIZE, "out_features": HIDDEN_SIZE // 2},
-                {"type": "ReLU"},
-                {"type": "Linear", "in_features": HIDDEN_SIZE // 2, "out_features": NUM_CLASSES}
+                {"type": "Linear", "in_features": HIDDEN_SIZE, "out_features": NUM_CLASSES}
             ]
         },
         "feature_buckets": {
@@ -577,6 +575,7 @@ if __name__ == '__main__':
     
     print("\n📋 Model Summary:")
     print(f"  • Input size: {INPUT_SIZE} (one-hot encoded features)")
-    print(f"  • Architecture: {INPUT_SIZE} → {HIDDEN_SIZE} → {HIDDEN_SIZE//2} → {NUM_CLASSES}")
+    print(f"  • Architecture: {INPUT_SIZE} → {HIDDEN_SIZE} → {NUM_CLASSES}")
+    print(f"  • Max weight matrix: {INPUT_SIZE}*{HIDDEN_SIZE} = {INPUT_SIZE*HIDDEN_SIZE} (within 1024 limit)")
     print(f"  • Classes: Authorized (0), Denied (1), Padding (2,3)")
     print(f"  • Features: Budget, Trust, Amount, Category, Velocity, Day, Time, Risk")
