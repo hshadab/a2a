@@ -570,6 +570,36 @@ async def agent_card():
     )
 
 
+@app.get("/")
+async def root():
+    """ThreatProof - Verifiable Threat Intelligence Network"""
+    stats = await db.get_network_stats()
+    return {
+        "name": "ThreatProof",
+        "description": "Autonomous threat intelligence with zkML-verified classifications",
+        "status": "running" if scout.running else "stopped",
+        "stats": {
+            "batches_processed": scout.batches_processed,
+            "urls_classified": scout.urls_processed,
+            "total_in_database": stats.total_urls if stats else 0,
+            "phishing_detected": stats.phishing_count if stats else 0,
+        },
+        "agents": {
+            "scout": config.scout_url,
+            "policy": config.policy_url,
+            "analyst": config.analyst_url
+        },
+        "endpoints": {
+            "docs": "/docs",
+            "health": "/health",
+            "stats": "/stats",
+            "websocket": "/ws",
+            "trigger_batch": "/trigger"
+        },
+        "technology": ["A2A Protocol", "x402 Payments", "zkML Proofs", "Base/USDC"]
+    }
+
+
 @app.get("/health")
 async def health():
     return {
