@@ -330,6 +330,7 @@ class JoltAtlasProver:
 
             output_data = {
                 "decision": decision,
+                "classification": decision,  # Alias for classifier compatibility
                 "confidence": confidence,
                 "approved": approved,
                 "output_class": output_class,
