@@ -263,6 +263,41 @@ async def stats():
     return policy_agent.get_stats()
 
 
+@app.get("/debug-prover")
+async def debug_prover():
+    """Debug endpoint to test prover directly"""
+    import subprocess
+    import os
+
+    zkml_path = os.environ.get('ZKML_CLI_PATH', 'zkml-cli')
+    jolt_model_dir = os.environ.get('JOLT_MODEL_DIR', '')
+    model_path = os.path.join(jolt_model_dir, 'network.onnx') if jolt_model_dir else ''
+
+    result = {
+        "zkml_path": zkml_path,
+        "zkml_exists": os.path.isfile(zkml_path),
+        "zkml_executable": os.access(zkml_path, os.X_OK) if os.path.isfile(zkml_path) else False,
+        "jolt_model_dir": jolt_model_dir,
+        "model_path": model_path,
+        "model_exists": os.path.isfile(model_path) if model_path else False,
+    }
+
+    # Try to run the binary with minimal args to see what happens
+    if result["zkml_exists"] and result["model_exists"]:
+        try:
+            # Test run with 8 inputs (authorization model expects 64 but let's see the error)
+            test_inputs = ["1000"] * 64
+            cmd = [zkml_path, model_path] + test_inputs
+            proc = subprocess.run(cmd, capture_output=True, timeout=30)
+            result["test_returncode"] = proc.returncode
+            result["test_stdout"] = proc.stdout.decode()[:1000]
+            result["test_stderr"] = proc.stderr.decode()[:1000]
+        except Exception as e:
+            result["test_error"] = str(e)
+
+    return result
+
+
 @app.post("/skills/authorize-batch")
 async def authorize_batch(request: AuthorizeRequest) -> AuthorizeResponse:
     """
