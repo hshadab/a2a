@@ -43,7 +43,8 @@ from shared.prover import authorization_prover, classifier_prover
 from sources import (
     PhishTankSource, OpenPhishSource, URLhausSource,
     SyntheticSource, AlexaTopSource,
-    CertTransparencySource, TwitterSource, PasteSiteSource
+    CertTransparencySource, TwitterSource, PasteSiteSource,
+    TyposquatSource
 )
 from shared.reputation import reputation_manager
 
@@ -64,16 +65,20 @@ class ScoutAgent:
 
     def __init__(self):
         # Build sources list based on configuration
+        # Priority order: original discovery first, then aggregation, then synthetic fallback
         self.sources = [
+            # ORIGINAL DISCOVERY - finds threats before anyone else
+            CertTransparencySource(lookback_days=1),  # New certs impersonating brands
+            TyposquatSource(check_interval_hours=6),  # Proactive typosquat scanning
+
+            # AGGREGATION - known threat feeds
             OpenPhishSource(),    # Real phishing URLs (free, no API key)
             URLhausSource(),      # Real malware URLs (free, no API key)
-            SyntheticSource(phishing_ratio=0.35),  # Fallback if real sources empty
+
+            # FALLBACK - synthetic for demo if all else empty
+            SyntheticSource(phishing_ratio=0.35),
             # PhishTankSource(),  # Enable when API key available
         ]
-
-        # Add Certificate Transparency source if enabled
-        if config.enable_ct_source:
-            self.sources.append(CertTransparencySource(lookback_days=1))
 
         # Add Twitter source if enabled and configured
         if config.enable_twitter_source and config.twitter_bearer_token:

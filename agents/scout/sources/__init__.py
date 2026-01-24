@@ -9,6 +9,7 @@ from .synthetic import SyntheticSource, AlexaTopSource
 from .crtsh import CertTransparencySource
 from .twitter import TwitterSource
 from .pastebin import PasteSiteSource
+from .typosquat import TyposquatSource
 
 __all__ = [
     'URLSource',
@@ -20,4 +21,5 @@ __all__ = [
     'CertTransparencySource',
     'TwitterSource',
     'PasteSiteSource',
+    'TyposquatSource',
 ]
