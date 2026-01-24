@@ -267,15 +267,52 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
     }
   };
 
+  // Check for sample URLs to display
+  const sampleUrls = event.data.sample_urls || event.data.sample_results;
+  const hasSamples = sampleUrls && sampleUrls.length > 0;
+
   return (
-    <div className={`flex items-start gap-3 text-sm py-2 border-b border-gray-800/50 animate-slide-in ${color}`}>
-      <span className="text-gray-500 w-20 flex-shrink-0">{time}</span>
-      <span className="w-6">{icon}</span>
-      <span className="flex-1">{getMessage()}</span>
-      {event.data.batch_id && (
-        <span className="text-gray-600 text-xs font-mono">
-          {event.data.batch_id.slice(0, 8)}
-        </span>
+    <div className={`text-sm py-2 border-b border-gray-800/50 animate-slide-in ${color}`}>
+      <div className="flex items-start gap-3">
+        <span className="text-gray-500 w-20 flex-shrink-0">{time}</span>
+        <span className="w-6">{icon}</span>
+        <span className="flex-1">{getMessage()}</span>
+        {event.data.batch_id && (
+          <span className="text-gray-600 text-xs font-mono">
+            {event.data.batch_id.slice(0, 8)}
+          </span>
+        )}
+      </div>
+      {/* Show sample URLs if available */}
+      {hasSamples && (
+        <div className="ml-[116px] mt-1.5 space-y-0.5">
+          {sampleUrls.slice(0, 3).map((item: string | { url: string; classification: string }, i: number) => {
+            const url = typeof item === 'string' ? item : item.url;
+            const classification = typeof item === 'object' ? item.classification : null;
+            // Truncate long URLs
+            const displayUrl = url.length > 60 ? url.slice(0, 57) + '...' : url;
+            return (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className="text-gray-600">-</span>
+                <span className="font-mono text-gray-400 break-all">{displayUrl}</span>
+                {classification && (
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                    classification === 'phishing' ? 'bg-red-500/20 text-red-400' :
+                    classification === 'safe' ? 'bg-green-500/20 text-green-400' :
+                    'bg-yellow-500/20 text-yellow-400'
+                  }`}>
+                    {classification}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+          {sampleUrls.length > 3 && (
+            <span className="text-xs text-gray-600 ml-4">
+              +{sampleUrls.length - 3} more...
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

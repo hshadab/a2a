@@ -134,13 +134,14 @@ broadcaster = EventBroadcaster()
 
 # ============ Convenience functions for common events ============
 
-async def emit_scout_found_urls(batch_id: str, url_count: int, source: str):
+async def emit_scout_found_urls(batch_id: str, url_count: int, source: str, sample_urls: list = None):
     await broadcaster.broadcast_dict(
         EventType.SCOUT_FOUND_URLS,
         {
             "batch_id": batch_id,
             "url_count": url_count,
-            "source": source
+            "source": source,
+            "sample_urls": sample_urls[:5] if sample_urls else []  # Show first 5 URLs
         }
     )
 
@@ -245,7 +246,8 @@ async def emit_analyst_response(
     safe_count: int,
     suspicious_count: int,
     proof_hash: str,
-    prove_time_ms: int
+    prove_time_ms: int,
+    sample_results: list = None
 ):
     await broadcaster.broadcast_dict(
         EventType.ANALYST_RESPONSE,
@@ -255,7 +257,8 @@ async def emit_analyst_response(
             "safe_count": safe_count,
             "suspicious_count": suspicious_count,
             "proof_hash": proof_hash,
-            "prove_time_ms": prove_time_ms
+            "prove_time_ms": prove_time_ms,
+            "sample_results": sample_results[:5] if sample_results else []  # Show first 5 classified URLs
         }
     )
 

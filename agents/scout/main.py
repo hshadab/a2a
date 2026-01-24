@@ -65,10 +65,10 @@ class ScoutAgent:
     def __init__(self):
         # Build sources list based on configuration
         self.sources = [
-            SyntheticSource(phishing_ratio=0.35),  # For demo
+            OpenPhishSource(),    # Real phishing URLs (free, no API key)
+            URLhausSource(),      # Real malware URLs (free, no API key)
+            SyntheticSource(phishing_ratio=0.35),  # Fallback if real sources empty
             # PhishTankSource(),  # Enable when API key available
-            # OpenPhishSource(),
-            # URLhausSource(),
         ]
 
         # Add Certificate Transparency source if enabled
@@ -125,7 +125,7 @@ class ScoutAgent:
         batch_id = str(uuid.uuid4())
         logger.info(f"Batch {batch_id}: Found {len(urls)} URLs from {source_name}")
 
-        await emit_scout_found_urls(batch_id, len(urls), source_name)
+        await emit_scout_found_urls(batch_id, len(urls), source_name, sample_urls=urls)
 
         # 2. Calculate costs
         policy_cost = config.policy_price_per_decision
