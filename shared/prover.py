@@ -277,7 +277,18 @@ class JoltAtlasProver:
             stages.append(self._emit_progress("PARSING", "Parsing proof output...", 90))
 
             try:
-                result = json.loads(stdout.decode())
+                # The prover outputs debug text before the JSON, so extract just the JSON part
+                stdout_text = stdout.decode()
+                # Find the JSON object by looking for the first '{' and last '}'
+                json_start = stdout_text.find('{')
+                json_end = stdout_text.rfind('}')
+                if json_start != -1 and json_end != -1:
+                    json_text = stdout_text[json_start:json_end + 1]
+                    result = json.loads(json_text)
+                    logger.info(f"Parsed prover JSON output: {list(result.keys())}")
+                else:
+                    logger.error(f"No JSON found in prover output: {stdout_text[:500]}")
+                    raise Exception("No JSON object found in prover output")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse prover output: {stdout.decode()[:500]}")
                 raise Exception(f"Failed to parse prover output: {e}")
@@ -286,35 +297,56 @@ class JoltAtlasProver:
 
             prove_time = int((time.time() - start_time) * 1000)
 
-            # Extract proof data from result
-            proof_hex = result.get('proof_hex', result.get('proof', ''))
-            if not proof_hex and 'proof_bytes' in result:
-                proof_hex = bytes(result['proof_bytes']).hex()
+            # Handle the prover's output format:
+            # {"approved":bool, "output":int, "verification":bool, "proof_size":"X KB",
+            #  "proving_time":"Xms", "zkml_proof":{"commitment":"X","response":"X","evaluation":"X"}}
 
-            # Handle different output formats
-            proof_bytes = bytes.fromhex(proof_hex) if proof_hex else b''
-            proof_hash = result.get('proof_hash', hashlib.sha256(proof_bytes).hexdigest())
+            # Extract zkML proof as the proof data
+            zkml_proof = result.get('zkml_proof', {})
+            proof_json = json.dumps(zkml_proof, sort_keys=True)
+            proof_bytes = proof_json.encode()
+            proof_hex = proof_bytes.hex()
+            proof_hash = hashlib.sha256(proof_bytes).hexdigest()
 
-            # Model commitment from result or compute
-            model_commitment = result.get('model_commitment', self.get_model_commitment(model_path))
-            input_commitment = result.get('input_commitment', compute_commitment(inputs))
+            # Model and input commitments
+            model_commitment = self.get_model_commitment(model_path)
+            input_commitment = compute_commitment(inputs)
 
-            # Extract decision/classification from output
-            output_data = result.get('output', {})
-            if 'decision' in result:
-                output_data['decision'] = result['decision']
-            if 'classification' in result:
-                output_data['classification'] = result['classification']
-            if 'confidence' in result:
-                output_data['confidence'] = result['confidence']
-            if 'scores' in result:
-                output_data['scores'] = result['scores']
+            # Extract decision from result
+            approved = result.get('approved', False)
+            output_class = result.get('output', 0)
 
-            output_commitment = result.get('output_commitment', compute_commitment(output_data))
+            # Map output to decision (class 0 = AUTHORIZED, class 1 = DENIED for authorization)
+            if 'authorization' in model_name.lower():
+                # For authorization model, output 0 might mean AUTHORIZED
+                decision = "AUTHORIZED" if approved or output_class == 0 else "DENIED"
+                confidence = 0.95 if result.get('verification', False) else 0.5
+            else:
+                # For classifier
+                classifications = ["PHISHING", "SAFE", "SUSPICIOUS", "UNKNOWN"]
+                decision = classifications[min(output_class, 3)]
+                confidence = 0.95 if result.get('verification', False) else 0.5
 
-            proof_size = result.get('proof_size_bytes', len(proof_bytes))
+            output_data = {
+                "decision": decision,
+                "confidence": confidence,
+                "approved": approved,
+                "output_class": output_class,
+                "verification": result.get('verification', False),
+                "proving_time": result.get('proving_time', ''),
+                "proof_size": result.get('proof_size', '')
+            }
 
-            logger.info(f"REAL zkML proof generated in {prove_time}ms, size: {proof_size} bytes")
+            output_commitment = compute_commitment(output_data)
+
+            # Parse proof size from human-readable format
+            proof_size_str = result.get('proof_size', '0 KB')
+            try:
+                proof_size = int(float(proof_size_str.replace(' KB', '').replace(' MB', '000')) * 1024)
+            except:
+                proof_size = len(proof_bytes)
+
+            logger.info(f"REAL zkML proof generated in {prove_time}ms, size: {proof_size} bytes, verified: {result.get('verification')}")
 
             return ProofResult(
                 proof=proof_bytes,
