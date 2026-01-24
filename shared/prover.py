@@ -217,8 +217,9 @@ class JoltAtlasProver:
 
             return one_hot
         else:
-            # For URL classifier, use standard scaling
-            SCALE = 65536
+            # For URL classifier, use smaller scaling compatible with prover
+            # The prover has limits on integer values, so we use a smaller scale
+            SCALE = 128  # Smaller scale to stay within prover limits
             int_inputs = []
             for val in inputs[:32]:
                 clamped = max(0.0, min(1.0, val))
