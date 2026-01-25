@@ -231,8 +231,8 @@ function StatCard({
 
 function EventRow({ event }: { event: { type: string; timestamp: string; data: Record<string, any> } }) {
   const time = new Date(event.timestamp).toLocaleTimeString();
-  const icon = getEventIcon(event.type);
-  const color = getEventColor(event.type);
+  const icon = getEventIcon(event.type, event.data);
+  const color = getEventColor(event.type, event.data);
 
   const getMessage = () => {
     switch (event.type) {
@@ -245,7 +245,9 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
       case 'POLICY_RESPONSE':
         return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}% confidence)`;
       case 'POLICY_VERIFIED':
-        return `Policy proof verified in ${event.data.verify_time_ms}ms`;
+        return event.data.valid !== false
+          ? `Policy proof verified in ${event.data.verify_time_ms}ms`
+          : `Policy proof verification failed (${event.data.verify_time_ms}ms)`;
       case 'PAYMENT_SENDING':
         return `Sending ${event.data.amount_usdc} USDC`;
       case 'PAYMENT_SENT':
@@ -257,7 +259,9 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
       case 'ANALYST_RESPONSE':
         return `Classified: ${event.data.phishing_count} phishing, ${event.data.safe_count} safe, ${event.data.suspicious_count} suspicious`;
       case 'WORK_VERIFIED':
-        return `Work proof verified in ${event.data.verify_time_ms}ms`;
+        return event.data.valid !== false
+          ? `Work proof verified in ${event.data.verify_time_ms}ms`
+          : `Work proof verification failed (${event.data.verify_time_ms}ms)`;
       case 'DATABASE_UPDATED':
         return `Added ${event.data.urls_added} URLs (total: ${event.data.total_urls})`;
       case 'ERROR':

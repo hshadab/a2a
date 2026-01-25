@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, Search, Scale, Microscope } from 'lucide-react';
 
 type AgentState = 'idle' | 'active' | 'working' | 'proving' | 'sending' | 'receiving';
 type ConnectionState = 'idle' | 'active' | 'data' | 'payment' | 'proof';
@@ -260,7 +260,7 @@ export default function AgentTriangle({
                 eyeDirection={getEyeDirection('scout')}
                 color="#3b82f6"
               />
-              <span className="text-lg">🔭</span>
+              <Search size={18} className="text-blue-400" />
             </div>
           </div>
           <span className="mt-1 text-sm font-semibold text-blue-400">Scout</span>
@@ -285,7 +285,7 @@ export default function AgentTriangle({
                 eyeDirection={getEyeDirection('policy')}
                 color="#a855f7"
               />
-              <span className="text-lg">⚖️</span>
+              <Scale size={18} className="text-purple-400" />
             </div>
           </div>
           <span className="mt-1 text-sm font-semibold text-purple-400">Policy</span>
@@ -313,7 +313,7 @@ export default function AgentTriangle({
                 eyeDirection={getEyeDirection('analyst')}
                 color="#22d3ee"
               />
-              <span className="text-lg">🔬</span>
+              <Microscope size={18} className="text-cyan-400" />
             </div>
           </div>
           <span className="mt-1 text-sm font-semibold text-cyan-400">Analyst</span>

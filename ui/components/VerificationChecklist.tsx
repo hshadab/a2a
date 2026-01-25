@@ -164,7 +164,7 @@ function CheckRow({ check, index }: { check: VerificationCheck; index: number })
         <div className="flex items-center justify-between">
           <span className={`text-sm font-medium ${getStatusColor()}`}>{check.name}</span>
           {check.status === 'passed' && (
-            <span className="text-xs text-green-600">✓</span>
+            <CheckCircle size={12} className="text-green-600" />
           )}
         </div>
         <p className="text-xs text-gray-500">{check.description}</p>

@@ -120,7 +120,9 @@ export default function HistoryPage() {
       case 'POLICY_RESPONSE':
         return `Spending ${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}% confidence)`;
       case 'POLICY_VERIFIED':
-        return `Spending policy proof verified in ${event.data.verify_time_ms}ms`;
+        return event.data.valid
+          ? `Spending policy proof verified in ${event.data.verify_time_ms}ms`
+          : `Spending policy proof verification failed (${event.data.verify_time_ms}ms)`;
       case 'PAYMENT_SENDING':
         return `Sending ${event.data.amount_usdc} USDC payment`;
       case 'PAYMENT_SENT':
@@ -132,7 +134,9 @@ export default function HistoryPage() {
       case 'ANALYST_RESPONSE':
         return `Classified: ${event.data.phishing_count} phishing, ${event.data.safe_count} safe`;
       case 'WORK_VERIFIED':
-        return `Classification proof verified in ${event.data.verify_time_ms}ms`;
+        return event.data.valid
+          ? `Classification proof verified in ${event.data.verify_time_ms}ms`
+          : `Classification proof verification failed (${event.data.verify_time_ms}ms)`;
       case 'DATABASE_UPDATED':
         return `Stored ${event.data.urls_added} URLs (total: ${event.data.total_urls})`;
       case 'ERROR':
@@ -229,19 +233,19 @@ export default function HistoryPage() {
                   <div className="flex items-start gap-4">
                     {/* Icon */}
                     <div className="text-2xl w-8 flex-shrink-0">
-                      {getEventIcon(event.type)}
+                      {getEventIcon(event.type, event.data)}
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3">
-                        <span className={`font-medium ${getEventColor(event.type)}`}>
+                        <span className={`font-medium ${getEventColor(event.type, event.data)}`}>
                           {getMessage(event)}
                         </span>
-                        {event.type.includes('VERIFIED') && (
+                        {event.type.includes('VERIFIED') && event.data.valid !== false && (
                           <CheckCircle size={16} className="text-green-400" />
                         )}
-                        {event.type === 'ERROR' && (
+                        {(event.type === 'ERROR' || (event.type.includes('VERIFIED') && event.data.valid === false)) && (
                           <XCircle size={16} className="text-red-400" />
                         )}
                       </div>
