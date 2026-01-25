@@ -5,7 +5,15 @@ Classifies URLs as PHISHING, SAFE, or SUSPICIOUS with zkML proofs.
 Uses Jolt Atlas to generate cryptographic proofs that the classification
 was computed correctly.
 
-Payment is required via x402 before classification.
+Payment Flow (Proof-Gated):
+1. Scout requests classification (no payment required upfront)
+2. Analyst does work, generates zkML proof
+3. Analyst returns results + proof + payment_due
+4. Scout verifies the proof
+5. If valid, Scout pays Analyst
+6. If invalid, no payment
+
+This ensures: NO VALID PROOF = NO PAYMENT
 """
 import asyncio
 import os
@@ -61,6 +69,15 @@ class ClassificationResult(BaseModel):
     output_commitment: str
 
 
+class PaymentDue(BaseModel):
+    """Payment information for proof-gated payment flow"""
+    amount: float
+    currency: str = "USDC"
+    recipient: str
+    chain: str
+    memo: str
+
+
 class ClassifyResponse(BaseModel):
     batch_id: str
     results: List[ClassificationResult]
@@ -71,6 +88,8 @@ class ClassifyResponse(BaseModel):
     output_commitment: str
     prove_time_ms: int
     timestamp: str
+    # Payment due after proof verification (proof-gated flow)
+    payment_due: Optional[PaymentDue] = None
 
 
 # ============ Analyst Agent ============
@@ -201,6 +220,16 @@ class AnalystAgent:
             prove_time_ms=batch_proof.prove_time_ms
         )
 
+        # Calculate payment due (for proof-gated payment flow)
+        payment_amount = self.calculate_price(len(urls))
+        payment_due = PaymentDue(
+            amount=payment_amount,
+            currency="USDC",
+            recipient=self.wallet_address,
+            chain=config.base_chain_caip2,
+            memo=f"classify-{batch_id}"
+        )
+
         return ClassifyResponse(
             batch_id=batch_id,
             results=results,
@@ -210,7 +239,8 @@ class AnalystAgent:
             input_commitment=batch_proof.input_commitment,
             output_commitment=batch_proof.output_commitment,
             prove_time_ms=batch_proof.prove_time_ms,
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
+            payment_due=payment_due
         )
 
     def get_stats(self) -> dict:
@@ -301,17 +331,13 @@ async def agent_card():
 
 @app.get("/health")
 async def health():
-    import os
-    zkml_path = os.environ.get('ZKML_CLI_PATH', 'zkml-cli')
-    zkml_exists = os.path.isfile(zkml_path) if zkml_path.startswith('/') else False
     return {
         "status": "healthy",
+        "production_mode": config.production_mode,
         "model_commitment": analyst_agent.model_commitment,
-        "zkml_cli_path": zkml_path,
-        "zkml_binary_exists": zkml_exists,
         "zkml_available": classifier_prover.prover.zkml_available,
-        "jolt_model_dir": os.environ.get('JOLT_MODEL_DIR', 'not set'),
-        "classifier_model_path": os.environ.get('CLASSIFIER_MODEL_PATH', config.classifier_model_path)
+        "real_proofs_enabled": classifier_prover.prover.zkml_available,
+        "payment_flow": "proof-gated"
     }
 
 
@@ -321,121 +347,28 @@ async def stats():
     return analyst_agent.get_stats()
 
 
-@app.get("/debug-prover")
-async def debug_prover():
-    """Debug endpoint to test prover directly"""
-    import subprocess
-    import os
-
-    zkml_path = os.environ.get('ZKML_CLI_PATH', 'zkml-cli')
-    model_path = os.environ.get('CLASSIFIER_MODEL_PATH', config.classifier_model_path)
-
-    result = {
-        "zkml_path": zkml_path,
-        "zkml_exists": os.path.isfile(zkml_path),
-        "zkml_executable": os.access(zkml_path, os.X_OK) if os.path.isfile(zkml_path) else False,
-        "model_path": model_path,
-        "model_exists": os.path.isfile(model_path),
-        "jolt_model_dir": os.environ.get('JOLT_MODEL_DIR', 'not set'),
-    }
-
-    # Test the classifier model with simple inputs (32 values, scale 128)
-    if result["zkml_exists"] and result["model_exists"]:
-        try:
-            # Simple test inputs (scaled 0-128)
-            test_inputs = [64] * 32  # All 0.5 values scaled
-            cmd = [zkml_path, model_path] + [str(v) for v in test_inputs]
-            result["command"] = f"{zkml_path} {model_path} " + " ".join([str(v) for v in test_inputs[:5]]) + " ..."
-
-            proc = subprocess.run(cmd, capture_output=True, timeout=120)
-            result["classifier_test"] = {
-                "returncode": proc.returncode,
-                "success": proc.returncode == 0,
-                "stdout_preview": proc.stdout.decode()[:500] if proc.stdout else "",
-                "stderr_last": proc.stderr.decode()[-500:] if proc.stderr else ""
-            }
-        except subprocess.TimeoutExpired:
-            result["classifier_test_error"] = "Timeout after 120s"
-        except Exception as e:
-            result["classifier_test_error"] = str(e)
-
-    return result
-
-
 @app.post("/skills/classify-urls")
 async def classify_urls(
     request: ClassifyRequest,
-    http_request: Request,
-    x_402_receipt: Optional[str] = Header(None, alias="X-402-Receipt"),
-    x_payment: Optional[str] = Header(None, alias="X-PAYMENT")
+    http_request: Request
 ) -> ClassifyResponse:
     """
-    Classify URLs with zkML proof.
+    Classify URLs with zkML proof (Proof-Gated Payment Flow).
 
-    Requires x402 payment (supports both v1 and v2).
-    - v2: X-PAYMENT header
-    - v1: X-402-Receipt header
+    NO payment required upfront. Flow:
+    1. Scout calls this endpoint
+    2. Analyst does work, generates zkML proof
+    3. Response includes results + proof + payment_due
+    4. Scout verifies the proof
+    5. If valid, Scout pays via /confirm-payment endpoint
+    6. If invalid, no payment (Scout keeps their money)
+
+    This ensures: NO VALID PROOF = NO PAYMENT
     """
-    # Calculate required payment
-    required_amount = analyst_agent.calculate_price(len(request.urls))
+    logger.info(f"Processing classification request for batch {request.batch_id} ({len(request.urls)} URLs)")
 
-    # Check for payment (v2 header takes priority)
-    payment_receipt = x_payment or x_402_receipt or get_payment_from_header(http_request)
-
-    if not payment_receipt:
-        raise PaymentRequired(
-            amount=required_amount,
-            recipient=analyst_agent.wallet_address,
-            resource="/skills/classify-urls",
-            description=f"Classify {len(request.urls)} URLs for batch {request.batch_id}"
-        )
-
-    # Verify payment
-    try:
-        # Use configurable tolerance (default 0.1%)
-        tolerance = 1 - config.payment_tolerance
-        is_valid, error = analyst_agent.x402_client.verify_payment(
-            tx_hash=payment_receipt,
-            expected_recipient=analyst_agent.wallet_address,
-            expected_amount_usdc=required_amount * tolerance
-        )
-
-        if not is_valid:
-            # In production mode, reject simulated payments
-            if config.production_mode:
-                if payment_receipt == "simulated":
-                    raise HTTPException(
-                        status_code=402,
-                        detail="Production mode requires real payments. Simulated payments are not accepted."
-                    )
-                raise HTTPException(
-                    status_code=402,
-                    detail=f"Payment verification failed: {error}"
-                )
-            # For demo, allow simulated payments with warning
-            if payment_receipt != "simulated":
-                logger.warning(f"Payment verification warning: {error}")
-    except HTTPException:
-        raise  # Re-raise HTTP exceptions
-    except (ConnectionError, ValueError) as e:
-        if config.production_mode:
-            raise HTTPException(
-                status_code=402,
-                detail=f"Payment verification failed: {e}"
-            )
-        logger.warning(f"Payment verification error (continuing in demo mode): {e}")
-    except Exception as e:
-        if config.production_mode:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Payment verification error: {e}"
-            )
-        logger.error(f"Unexpected payment verification error: {e}", exc_info=True)
-
-    # Process classification
-    analyst_agent.total_earned_usdc += required_amount
-    logger.info(f"Processing classification request for batch {request.batch_id}")
-
+    # Do the work and return proof + payment_due
+    # Payment will be made AFTER Scout verifies the proof
     return await analyst_agent.classify_batch(
         batch_id=request.batch_id,
         urls=request.urls,
@@ -443,16 +376,65 @@ async def classify_urls(
     )
 
 
+class ConfirmPaymentRequest(BaseModel):
+    """Request to confirm payment after proof verification"""
+    batch_id: str
+    tx_hash: str
+    amount: float
+
+
+@app.post("/confirm-payment")
+async def confirm_payment(request: ConfirmPaymentRequest):
+    """
+    Confirm payment received after proof verification.
+
+    Called by Scout after:
+    1. Receiving classification results + proof
+    2. Verifying the zkML proof is valid
+    3. Making the USDC payment
+
+    This allows Analyst to track earnings.
+    """
+    # Verify payment if in production mode
+    if config.production_mode and request.tx_hash != "simulated":
+        try:
+            tolerance = 1 - config.payment_tolerance
+            is_valid, error = analyst_agent.x402_client.verify_payment(
+                tx_hash=request.tx_hash,
+                expected_recipient=analyst_agent.wallet_address,
+                expected_amount_usdc=request.amount * tolerance
+            )
+            if not is_valid:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Payment verification failed: {error}"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Payment verification error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Record earnings
+    analyst_agent.total_earned_usdc += request.amount
+    logger.info(f"Payment confirmed for batch {request.batch_id}: ${request.amount} USDC (tx: {request.tx_hash})")
+
+    return {
+        "status": "confirmed",
+        "batch_id": request.batch_id,
+        "amount": request.amount,
+        "total_earned": analyst_agent.total_earned_usdc
+    }
+
+
 # Alternative endpoint
 @app.post("/classify")
 async def classify(
     request: ClassifyRequest,
-    http_request: Request,
-    x_402_receipt: Optional[str] = Header(None, alias="X-402-Receipt"),
-    x_payment: Optional[str] = Header(None, alias="X-PAYMENT")
+    http_request: Request
 ) -> ClassifyResponse:
-    """Alias for classify-urls (supports x402 v1 and v2)"""
-    return await classify_urls(request, http_request, x_402_receipt, x_payment)
+    """Alias for classify-urls (proof-gated payment flow)"""
+    return await classify_urls(request, http_request)
 
 
 @app.post("/extract-features")
@@ -478,32 +460,28 @@ jsonrpc_router = JSONRPCRouter()
 @jsonrpc_router.method("task/send")
 async def task_send(params: dict) -> dict:
     """
-    A2A task/send method.
+    A2A task/send method (Proof-Gated Payment Flow).
 
     Creates a task, executes the classify-urls skill, and returns the result.
-    Requires x402 payment via paymentReceipt in params.
+    NO payment required upfront - payment is made AFTER proof verification.
+
+    Flow:
+    1. Scout sends task/send request (no payment needed)
+    2. Analyst executes classification, generates zkML proof
+    3. Response includes results + proof + payment_due
+    4. Scout verifies the proof
+    5. If valid, Scout pays and calls task/confirm-payment
     """
     skill_id = params.get("skillId", "classify-urls")
     input_data = params.get("input", {})
     context_id = params.get("contextId")
-    payment_receipt = params.get("paymentReceipt")
 
     if skill_id != "classify-urls":
         raise ValueError(f"Unknown skill: {skill_id}")
 
-    # Calculate required payment
+    # Calculate payment that will be due after proof verification
     urls = input_data.get("urls", [])
     required_amount = analyst_agent.calculate_price(len(urls))
-
-    # Check for payment
-    if not payment_receipt:
-        raise JSONRPCPaymentRequired({
-            "amount": str(required_amount),
-            "currency": "USDC",
-            "recipient": analyst_agent.wallet_address,
-            "chain": config.base_chain_caip2,
-            "memo": f"classify-{input_data.get('batch_id', 'batch')}"
-        })
 
     # Create task
     task = await analyst_task_store.create(
@@ -516,12 +494,7 @@ async def task_send(params: dict) -> dict:
         payment_chain=config.base_chain_caip2
     )
 
-    # Record payment
-    task.paymentReceipt = payment_receipt
-    task.paymentVerified = True  # Simplified verification for demo
-    await analyst_task_store.update(task)
-
-    # Execute the classification
+    # Execute the classification (no payment verification - proof-gated flow)
     async def classification_handler(inp: dict) -> dict:
         request = ClassifyRequest(**inp)
         response = await analyst_agent.classify_batch(
@@ -552,10 +525,14 @@ async def task_send(params: dict) -> dict:
             data=task.output.get("results", []),
             mime_type="application/json"
         )
-        await analyst_task_store.update(task)
 
-    # Update earnings
-    analyst_agent.total_earned_usdc += required_amount
+        # Add payment_due info as artifact (for proof-gated payment)
+        task.add_artifact(
+            name="payment_due",
+            data=task.output.get("payment_due", {}),
+            mime_type="application/json"
+        )
+        await analyst_task_store.update(task)
 
     return task.to_response()
 

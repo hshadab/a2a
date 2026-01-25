@@ -33,7 +33,7 @@ from shared.events import (
     emit_database_updated, emit_error
 )
 from shared.a2a import (
-    A2AClient, PaymentRequiredError,
+    A2AClient,
     invoke_policy_authorization, invoke_analyst_classification,
     build_agent_card, build_skill,
     build_agent_card_v3, build_skill_v3
@@ -200,17 +200,13 @@ class ScoutAgent:
         )
         await db.insert_batch(batch_record)
 
-        # 8. Request classification from Analyst Agent (with payment)
-        await emit_payment_sending(batch_id, analyst_cost, config.analyst_url)
-
+        # 8. Request classification from Analyst Agent (PROOF-GATED: no payment yet)
         try:
             class_response = await self._request_classification(
                 batch_id=batch_id,
                 urls=urls,
-                policy_proof_hash=auth_response["proof_hash"],
-                payment_amount=analyst_cost
+                policy_proof_hash=auth_response["proof_hash"]
             )
-            await emit_payment_sent(batch_id, class_response.get("payment_tx", "simulated"), analyst_cost)
         except (ConnectionError, TimeoutError, ValueError) as e:
             logger.error(f"Classification failed: {e}")
             await emit_error(batch_id, f"Classification failed: {e}")
@@ -220,16 +216,32 @@ class ScoutAgent:
             await emit_error(batch_id, f"Classification failed: {e}")
             return None
 
-        # 9. Verify work proof
+        # 9. Verify work proof BEFORE paying (proof-gated payment)
         work_valid, work_verify_time = await self._verify_work_proof(class_response)
         await emit_work_verified(batch_id, work_valid, work_verify_time)
 
         if not work_valid:
-            logger.error("Work proof verification failed!")
-            await emit_error(batch_id, "Work proof verification failed")
+            logger.error("Work proof verification failed - NOT PAYING")
+            await emit_error(batch_id, "Work proof verification failed - payment withheld")
             return None
 
-        # 10. Store classifications
+        # 10. Pay Analyst Agent ONLY after proof verification (proof-gated)
+        payment_due = class_response.get("payment_due", {})
+        analyst_payment_amount = payment_due.get("amount", analyst_cost)
+        await emit_payment_sending(batch_id, analyst_payment_amount, config.analyst_url)
+
+        analyst_receipt = await self._pay_agent(
+            config.analyst_url,
+            analyst_payment_amount,
+            f"classify-{batch_id}"
+        )
+        tx_hash = analyst_receipt.tx_hash if analyst_receipt else "simulated"
+        await emit_payment_sent(batch_id, tx_hash, analyst_payment_amount)
+
+        # 11. Confirm payment to Analyst
+        await self._confirm_analyst_payment(batch_id, tx_hash, analyst_payment_amount)
+
+        # 12. Store classifications
         await self._store_classifications(
             batch_id=batch_id,
             results=class_response["results"],
@@ -237,13 +249,13 @@ class ScoutAgent:
             model_commitment=class_response["model_commitment"],
             source=source_name,
             policy_proof_hash=auth_response["proof_hash"],
-            analyst_paid=analyst_cost
+            analyst_paid=analyst_payment_amount
         )
 
-        # 11. Update batch as complete
-        await db.complete_batch(batch_id, analyst_cost)
+        # 13. Update batch as complete
+        await db.complete_batch(batch_id, analyst_payment_amount)
 
-        # 12. Emit database update event
+        # 14. Emit database update event
         stats = await db.get_network_stats()
         await emit_database_updated(
             batch_id=batch_id,
@@ -375,39 +387,47 @@ class ScoutAgent:
         self,
         batch_id: str,
         urls: List[str],
-        policy_proof_hash: str,
-        payment_amount: float
+        policy_proof_hash: str
     ) -> dict:
-        """Request classification from Analyst Agent with payment"""
-        try:
-            # First attempt without payment to get 402
-            return await invoke_analyst_classification(
-                batch_id=batch_id,
-                urls=urls,
-                policy_proof_hash=policy_proof_hash
-            )
-        except PaymentRequiredError as e:
-            # Make payment
-            payment_info = e.payment_info
-            if payment_info:
-                receipt = await self.x402_client.make_payment(
-                    recipient=payment_info["recipient"],
-                    amount_usdc=float(payment_info["amount"]),
-                    memo=f"classify-{batch_id}"
-                )
-                tx_hash = receipt.tx_hash if receipt else "simulated"
-            else:
-                tx_hash = "simulated"
+        """
+        Request classification from Analyst Agent (proof-gated payment flow).
 
-            # Retry with payment
-            response = await invoke_analyst_classification(
-                batch_id=batch_id,
-                urls=urls,
-                policy_proof_hash=policy_proof_hash,
-                payment_receipt=tx_hash
-            )
-            response["payment_tx"] = tx_hash
-            return response
+        NO payment required upfront. Flow:
+        1. Call Analyst to do work
+        2. Analyst returns results + proof + payment_due
+        3. Scout verifies proof (in caller)
+        4. If valid, Scout pays (in caller)
+        """
+        return await invoke_analyst_classification(
+            batch_id=batch_id,
+            urls=urls,
+            policy_proof_hash=policy_proof_hash
+        )
+
+    async def _confirm_analyst_payment(
+        self,
+        batch_id: str,
+        tx_hash: str,
+        amount: float
+    ):
+        """Confirm payment to Analyst after proof verification"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{config.analyst_url}/confirm-payment",
+                    json={
+                        "batch_id": batch_id,
+                        "tx_hash": tx_hash,
+                        "amount": amount
+                    }
+                )
+                if response.status_code == 200:
+                    logger.info(f"Payment confirmed with Analyst for batch {batch_id}")
+                else:
+                    logger.warning(f"Payment confirmation response: {response.status_code}")
+        except Exception as e:
+            # Non-critical - payment was already made
+            logger.warning(f"Could not confirm payment with Analyst: {e}")
 
     async def _verify_work_proof(self, class_response: dict) -> tuple[bool, int]:
         """Verify the analyst's work proof"""
