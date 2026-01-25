@@ -12,8 +12,9 @@ from datetime import datetime
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 import uvicorn
 
 import sys
@@ -75,11 +76,11 @@ class ScoutAgent:
             # AGGREGATION - known threat feeds
             OpenPhishSource(),    # Real phishing URLs (free, no API key)
             URLhausSource(),      # Real malware URLs (free, no API key)
-
-            # FALLBACK - synthetic for demo if all else empty
-            SyntheticSource(phishing_ratio=0.35),
-            # PhishTankSource(),  # Enable when API key available
         ]
+
+        # Add PhishTank source if enabled (uses public data dump, API key optional)
+        if config.enable_phishtank_source:
+            self.sources.append(PhishTankSource(api_key=config.phishtank_api_key))
 
         # Add Twitter source if enabled and configured
         if config.enable_twitter_source and config.twitter_bearer_token:
@@ -88,6 +89,9 @@ class ScoutAgent:
         # Add paste site source if enabled
         if config.enable_paste_source:
             self.sources.append(PasteSiteSource())
+
+        # FALLBACK - synthetic for demo if all else empty (always last)
+        self.sources.append(SyntheticSource(phishing_ratio=0.35))
 
         self.a2a_client = A2AClient()
         self.x402_client = X402Client()
@@ -523,7 +527,14 @@ scout = ScoutAgent()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup validation
+    if config.production_mode:
+        config.assert_production_ready()
+        logger.info("Production mode enabled - all validations passed")
+    else:
+        logger.warning("Running in DEMO mode - simulated proofs/payments allowed")
+
+    # Initialize database and start scout loop
     await db.connect()
     await db.init_schema()
     asyncio.create_task(scout.start())
@@ -623,8 +634,25 @@ async def stats():
 
 
 @app.post("/trigger")
-async def trigger_batch():
-    """Manually trigger a batch (for testing)"""
+async def trigger_batch(x_api_key: Optional[str] = Header(None, alias="X-API-Key")):
+    """
+    Manually trigger a batch (for testing).
+
+    Requires API key authentication if SCOUT_API_KEY is configured.
+    """
+    # Check API key if configured
+    if config.scout_api_key:
+        if not x_api_key:
+            raise HTTPException(
+                status_code=401,
+                detail="API key required. Set X-API-Key header."
+            )
+        if x_api_key != config.scout_api_key:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid API key."
+            )
+
     batch_id = await scout.process_batch()
     return {"batch_id": batch_id}
 

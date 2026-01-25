@@ -1,4 +1,4 @@
-.PHONY: setup build run stop logs clean dev test
+.PHONY: setup setup-zkml build run stop logs clean dev test validate
 
 # Setup the project
 setup:
@@ -7,7 +7,23 @@ setup:
 	pip install -r requirements.txt
 	@echo "Installing UI dependencies..."
 	cd ui && npm install
+	@echo ""
 	@echo "Setup complete!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Copy .env.example to .env and configure"
+	@echo "  2. Run 'make setup-zkml' to install the zkML prover"
+	@echo "  3. Run 'make dev' to start development environment"
+
+# Setup zkML prover binary
+setup-zkml:
+	@echo "Installing zkML (Jolt Atlas) prover binary..."
+	./scripts/setup_zkml.sh
+
+# Validate production configuration
+validate:
+	@echo "Validating configuration..."
+	@python3 -c "from shared.config import config; errors = config.validate_production_requirements(); print('\\n'.join(errors) if errors else 'All validations passed!')"
 
 # Build all containers
 build:

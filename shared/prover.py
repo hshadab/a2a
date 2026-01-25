@@ -80,8 +80,8 @@ class JoltAtlasProver:
     """
 
     def __init__(self, jolt_model_dir: Optional[str] = None):
-        self.zkml_cli_path = os.environ.get('ZKML_CLI_PATH', 'zkml-cli')
-        self.jolt_model_dir = jolt_model_dir or os.environ.get('JOLT_MODEL_DIR', 'models/jolt')
+        self.zkml_cli_path = config.zkml_cli_path
+        self.jolt_model_dir = jolt_model_dir or config.jolt_model_dir
 
         # Check if zkml-cli is available
         self.zkml_available = self._check_zkml_cli()
@@ -378,6 +378,7 @@ class JoltAtlasProver:
         Generate a zkML proof for model inference.
 
         Uses real Jolt Atlas when available, otherwise simulates.
+        In production mode, raises an error if real proof generation is not available.
         """
         stages: List[ProofStage] = []
         start_time = time.time()
@@ -404,11 +405,30 @@ class JoltAtlasProver:
                         model_name=model_name
                     )
                 else:
+                    if config.production_mode:
+                        raise RuntimeError(
+                            f"Production mode requires real zkML proofs but Jolt model not found for {model_name}. "
+                            f"Expected model at: {model_path}"
+                        )
                     logger.warning(f"Jolt model not found for {model_name}, falling back to simulation")
+            except RuntimeError:
+                raise  # Re-raise production mode errors
             except Exception as e:
+                if config.production_mode:
+                    raise RuntimeError(
+                        f"Production mode requires real zkML proofs but proof generation failed: {e}"
+                    )
                 logger.warning(f"Real proof generation failed, falling back to simulation: {e}")
+        else:
+            # zkml-cli not available
+            if config.production_mode:
+                raise RuntimeError(
+                    f"Production mode requires real zkML proofs but zkml-cli is not available. "
+                    f"Set ZKML_CLI_PATH environment variable to the zkml-cli binary path."
+                )
 
         # Simulated proof generation with realistic stages
+        logger.info(f"Generating SIMULATED proof for {model_name} (development mode)")
         stages.append(self._emit_progress("LOADING", "Loading model and inputs...", 5))
         await asyncio.sleep(0.1)
 

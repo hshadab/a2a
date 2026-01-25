@@ -235,7 +235,14 @@ analyst_agent = AnalystAgent()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup validation
+    if config.production_mode:
+        config.assert_production_ready()
+        logger.info("Production mode enabled - all validations passed")
+    else:
+        logger.warning("Running in DEMO mode - simulated proofs/payments allowed")
+
+    # Initialize database and analyst
     await db.connect()
     await analyst_agent.initialize()
     yield
@@ -385,19 +392,44 @@ async def classify_urls(
 
     # Verify payment
     try:
+        # Use configurable tolerance (default 0.1%)
+        tolerance = 1 - config.payment_tolerance
         is_valid, error = analyst_agent.x402_client.verify_payment(
             tx_hash=payment_receipt,
             expected_recipient=analyst_agent.wallet_address,
-            expected_amount_usdc=required_amount * 0.99  # Allow small tolerance
+            expected_amount_usdc=required_amount * tolerance
         )
 
         if not is_valid:
-            # For demo, allow simulated payments
+            # In production mode, reject simulated payments
+            if config.production_mode:
+                if payment_receipt == "simulated":
+                    raise HTTPException(
+                        status_code=402,
+                        detail="Production mode requires real payments. Simulated payments are not accepted."
+                    )
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Payment verification failed: {error}"
+                )
+            # For demo, allow simulated payments with warning
             if payment_receipt != "simulated":
                 logger.warning(f"Payment verification warning: {error}")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
     except (ConnectionError, ValueError) as e:
-        logger.warning(f"Payment verification error (continuing): {e}")
+        if config.production_mode:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Payment verification failed: {e}"
+            )
+        logger.warning(f"Payment verification error (continuing in demo mode): {e}")
     except Exception as e:
+        if config.production_mode:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Payment verification error: {e}"
+            )
         logger.error(f"Unexpected payment verification error: {e}", exc_info=True)
 
     # Process classification

@@ -70,17 +70,34 @@ Set it up. Walk away. Come back and watch it grow.
 - Docker and Docker Compose
 - Node.js 18+ (for UI development)
 - Python 3.11+ (for local development)
-- (Optional) Jolt Atlas for real zkML proofs
 
 ### 1. Clone and Configure
 
 ```bash
 cd threat-intel-network
+
+# Install dependencies
+make setup
+
+# Configure environment
 cp .env.example .env
-# Edit .env with your Base mainnet wallet details
+# Edit .env with your configuration
 ```
 
-### 2. Run with Docker
+### 2. Install zkML Prover (for real proofs)
+
+```bash
+# Download and install the Jolt Atlas zkML prover
+make setup-zkml
+
+# Verify installation
+make validate
+```
+
+The zkML prover is a 143MB binary that generates cryptographic proofs.
+Without it, the system runs in demo mode with simulated proofs.
+
+### 3. Run with Docker
 
 ```bash
 make build
@@ -93,7 +110,7 @@ Services:
 - **Analyst Agent**: http://localhost:8002
 - **UI Dashboard**: http://localhost:3001
 
-### 3. Watch It Work
+### 4. Watch It Work
 
 Open http://localhost:3001 to see the real-time dashboard.
 
@@ -103,6 +120,30 @@ The system will:
 3. Scout pays Analyst via x402 (USDC on Base)
 4. Analyst classifies with zkML proof
 5. Database grows, context improves
+
+## Demo vs Production Mode
+
+The system has two operating modes:
+
+### Demo Mode (default)
+- Simulated zkML proofs (fast, no binary needed)
+- Simulated USDC payments (no wallet needed)
+- Falls back to in-memory database if PostgreSQL unavailable
+- Perfect for testing and development
+
+### Production Mode
+Set `PRODUCTION_MODE=true` in your `.env` file.
+
+**Requirements:**
+- zkML prover binary installed (`make setup-zkml`)
+- PostgreSQL database configured
+- Wallet with USDC on Base mainnet
+- All proofs and payments are real
+
+```bash
+# Validate production requirements
+make validate
+```
 
 ## Pricing (Configurable)
 
