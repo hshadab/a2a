@@ -54,7 +54,8 @@ import httpx
 
 # ============ Pricing ============
 # Price for URL discovery service (paid by Analyst)
-DISCOVERY_PRICE_PER_URL = 0.0003  # $0.0003 per URL discovered
+# Set to match Policy price so Scout breaks even (receives $0.001, pays $0.001)
+DISCOVERY_PRICE_PER_BATCH = 0.001  # $0.001 flat per batch (not per URL)
 
 
 # ============ Scout Agent ============
@@ -608,9 +609,9 @@ async def agent_card():
                 tags=["threat-intel", "url-discovery", "phishing", "security"],
                 input_modes=["application/json"],
                 output_modes=["application/json"],
-                price_amount=DISCOVERY_PRICE_PER_URL,
+                price_amount=DISCOVERY_PRICE_PER_BATCH,
                 price_currency="USDC",
-                price_per="url",
+                price_per="batch",
                 chain=config.base_chain_caip2,
                 proof_required=True,  # Authorization proof included
                 model_commitment=None  # Policy model commitment returned in response
@@ -770,9 +771,9 @@ async def discover_urls(request: DiscoverRequest) -> DiscoverResponse:
     # 2. Get current budget (for Policy authorization)
     budget = await scout._get_budget()
 
-    # Calculate costs
+    # Calculate costs - flat rate per batch so Scout breaks even
     policy_cost = config.policy_price_per_decision
-    discovery_cost = len(urls) * DISCOVERY_PRICE_PER_URL
+    discovery_cost = DISCOVERY_PRICE_PER_BATCH  # Flat $0.001 per batch
 
     # 3. Request authorization from Policy Agent
     await emit_policy_requesting(batch_id, len(urls))

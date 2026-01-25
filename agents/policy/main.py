@@ -31,6 +31,10 @@ from shared.events import (
 )
 from shared.a2a import build_agent_card, build_skill, build_agent_card_v3, build_skill_v3
 from shared.prover import authorization_prover, compute_commitment
+from shared.x402 import X402Client
+
+# Feedback payment to Analyst (completes the circular economy)
+FEEDBACK_PAYMENT_AMOUNT = 0.001  # $0.001 per batch (matches what Policy receives)
 from shared.logging_config import policy_logger as logger
 from shared.jsonrpc import JSONRPCRouter, create_jsonrpc_endpoint, TaskNotFoundError
 from shared.task import TaskStore, Task, TaskState, execute_task
@@ -81,7 +85,9 @@ class PolicyAgent:
         self.authorizations_today = 0
         self.denials_today = 0
         self.total_authorized_usdc = 0.0
+        self.total_paid_to_analyst = 0.0
         self.model_commitment = None
+        self.x402_client = X402Client()
 
         # Configurable thresholds
         self.min_budget_ratio = 0.1  # Deny if cost > 10% of remaining budget
@@ -125,6 +131,13 @@ class PolicyAgent:
             self.authorizations_today += 1
             self.total_authorized_usdc += request.estimated_cost_usdc
             logger.info(f"Batch {request.batch_id} AUTHORIZED (confidence: {confidence:.2f})")
+
+            # Pay Analyst for classification feedback (completes circular economy)
+            # This creates: Analyst → Scout → Policy → Analyst (each $0.001)
+            try:
+                await self._pay_analyst_feedback(request.batch_id)
+            except Exception as e:
+                logger.warning(f"Could not pay Analyst feedback: {e}")
         else:
             self.denials_today += 1
             logger.info(f"Batch {request.batch_id} DENIED (confidence: {confidence:.2f})")
@@ -152,12 +165,47 @@ class PolicyAgent:
 
         return response
 
+    async def _pay_analyst_feedback(self, batch_id: str):
+        """
+        Pay Analyst for classification feedback.
+
+        This payment completes the circular economy:
+        Analyst → Scout → Policy → Analyst
+
+        Each step is $0.001, so net change is zero for all agents.
+        """
+        import httpx
+
+        # Get Analyst wallet address
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{config.analyst_url}/.well-known/agent.json")
+                if response.status_code == 200:
+                    card = response.json()
+                    analyst_wallet = card.get("defaultPaymentAddress", config.treasury_address)
+                else:
+                    analyst_wallet = config.treasury_address
+        except Exception:
+            analyst_wallet = config.treasury_address
+
+        # Make payment
+        receipt = await self.x402_client.make_payment(
+            recipient=analyst_wallet,
+            amount_usdc=FEEDBACK_PAYMENT_AMOUNT,
+            memo=f"feedback-{batch_id}"
+        )
+
+        tx_hash = receipt.tx_hash if receipt else "simulated"
+        self.total_paid_to_analyst += FEEDBACK_PAYMENT_AMOUNT
+        logger.info(f"Paid Analyst ${FEEDBACK_PAYMENT_AMOUNT} for feedback (tx: {tx_hash})")
+
     def get_stats(self) -> dict:
         """Get policy agent statistics"""
         return {
             "authorizations_today": self.authorizations_today,
             "denials_today": self.denials_today,
             "total_authorized_usdc": self.total_authorized_usdc,
+            "total_paid_to_analyst": self.total_paid_to_analyst,
             "approval_rate": (
                 self.authorizations_today /
                 max(1, self.authorizations_today + self.denials_today)

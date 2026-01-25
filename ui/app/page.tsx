@@ -150,43 +150,43 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Autonomous Economy Section */}
+      {/* Agent-to-Agent Micro-Economy */}
       <section className="mt-8 card p-6 border border-cyan-500/20">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
             <Cpu className="text-cyan-400" size={20} />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Autonomous Agent-to-Agent Commerce</h2>
-            <p className="text-sm text-gray-500">A self-sustaining AI micro-economy</p>
+            <h2 className="text-lg font-semibold text-white">Agent-to-Agent Micro-Economy</h2>
+            <p className="text-sm text-gray-500">Circular payment flow: Analyst → Scout → Policy → Analyst</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400" />
-              <span className="text-sm font-medium text-cyan-400">Discover</span>
+              <span className="text-sm font-medium text-cyan-400">Analyst → Scout</span>
             </div>
             <p className="text-xs text-gray-400">
-              Analyst requests URLs from Scout, who discovers threats from feeds and pays Policy for authorization.
+              Analyst pays Scout $0.001 for URL discovery. Scout discovers threats from CT logs, typosquatting, and feeds.
             </p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-400" />
-              <span className="text-sm font-medium text-green-400">Pay & Verify</span>
+              <span className="w-2 h-2 rounded-full bg-blue-400" />
+              <span className="text-sm font-medium text-blue-400">Scout → Policy</span>
             </div>
             <p className="text-xs text-gray-400">
-              Proof-gated payments: work is verified with zkML proofs before USDC is released via x402 protocol.
+              Scout pays Policy $0.001 for authorization. Policy generates zkML proof of correct decision.
             </p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-purple-400" />
-              <span className="text-sm font-medium text-purple-400">Self-Sustaining</span>
+              <span className="text-sm font-medium text-purple-400">Policy → Analyst</span>
             </div>
             <p className="text-xs text-gray-400">
-              USDC circulates between agents in a closed loop. Only gas is consumed—the economy runs indefinitely.
+              Policy pays Analyst $0.001 for classification feedback. Circle complete—net USDC change: $0.00.
             </p>
           </div>
         </div>

@@ -29,46 +29,46 @@ export default function AboutPage() {
           Architecture Overview
         </h2>
 
+        {/* Agents shown in payment order: Analyst → Scout → Policy → Analyst */}
         <div className="grid grid-cols-3 gap-6 mb-8">
-          <AgentBox
-            icon={<Search size={24} />}
-            name="Threat Scout"
-            role="URL Discovery"
-            color="#3b82f6"
-            description="Proactively discovers threats via typosquatting detection, Certificate Transparency monitoring, and threat feed aggregation."
-          />
-          <AgentBox
-            icon={<Scale size={24} />}
-            name="Spending Approval"
-            role="Proof of Correct Approval"
-            color="#a855f7"
-            description="Approves spending on URL classification. Generates zkML proofs that the approval decision was computed correctly."
-          />
           <AgentBox
             icon={<Microscope size={24} />}
             name="URL Classifier"
-            role="Proof of Analysis"
+            role="Customer & Orchestrator"
             color="#22d3ee"
-            description="Classifies URLs as phishing/safe using ML. Generates zkML proofs that the classification was computed correctly."
+            description="Pays Scout for URLs, classifies them as phishing/safe, and stores results. Receives feedback payments from Policy."
+          />
+          <AgentBox
+            icon={<Search size={24} />}
+            name="Threat Scout"
+            role="URL Discovery Service"
+            color="#3b82f6"
+            description="Discovers threats from CT logs, typosquatting, and feeds. Receives from Analyst, pays Policy for authorization."
+          />
+          <AgentBox
+            icon={<Scale size={24} />}
+            name="Policy Agent"
+            role="Authorization & Feedback"
+            color="#a855f7"
+            description="Authorizes spending with zkML proofs. Receives from Scout, pays Analyst for classification feedback."
           />
         </div>
 
-        {/* Flow Diagram - Value Chain */}
+        {/* Flow Diagram - Circular Economy */}
         <div className="bg-gray-800/50 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Value Chain Payment Flow</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">Circular Payment Flow</h3>
           <div className="flex items-center justify-between text-sm">
-            <FlowStep number={1} text="Analyst requests URLs from Scout" />
-            <ArrowRight className="text-gray-600" />
-            <FlowStep number={2} text="Scout discovers URLs" />
-            <ArrowRight className="text-gray-600" />
-            <FlowStep number={3} text="Scout gets Policy authorization + proof" />
-            <ArrowRight className="text-gray-600" />
-            <FlowStep number={4} text="Scout pays Policy (USDC)" />
-            <ArrowRight className="text-gray-600" />
-            <FlowStep number={5} text="Analyst pays Scout (USDC)" />
-            <ArrowRight className="text-gray-600" />
-            <FlowStep number={6} text="Analyst classifies + stores" />
+            <FlowStep number={1} text="Analyst pays Scout $0.001" />
+            <ArrowRight className="text-green-500" />
+            <FlowStep number={2} text="Scout pays Policy $0.001" />
+            <ArrowRight className="text-green-500" />
+            <FlowStep number={3} text="Policy pays Analyst $0.001" />
+            <ArrowRight className="text-cyan-500" />
+            <FlowStep number={4} text="Net change: $0.00" />
           </div>
+          <p className="text-center text-gray-500 text-xs mt-3">
+            USDC circulates forever. Only gas (~$0.003 per batch) is consumed.
+          </p>
         </div>
       </section>
 
@@ -293,12 +293,12 @@ let proof = jolt_atlas::prove(
         </TechSection>
       </div>
 
-      {/* Self-Sustaining Economy */}
+      {/* Agent-to-Agent Micro-Economy */}
       <section className="card p-8 border border-cyan-500/20">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
             <Zap className="text-yellow-400" />
-            The AI Micro-Economy
+            Agent-to-Agent Micro-Economy
           </h2>
           <span className="px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-sm text-green-400">
             Self-Sustaining
@@ -306,34 +306,80 @@ let proof = jolt_atlas::prove(
         </div>
 
         <p className="text-lg text-gray-300 mb-6 border-l-4 border-cyan-500 pl-4">
-          ThreatProof demonstrates <strong className="text-cyan-400">autonomous agent-to-agent commerce</strong> —
-          a mini-economy where AI agents discover work, negotiate prices, exchange payments, and verify results
-          without any human intervention.
+          ThreatProof demonstrates a <strong className="text-cyan-400">circular agent economy</strong> —
+          each agent pays the next, creating a closed loop where USDC circulates forever.
+          Only gas is consumed.
         </p>
+
+        {/* Circular Flow Diagram */}
+        <div className="bg-gray-800/50 rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-semibold text-white mb-4 text-center">Circular Payment Flow</h3>
+          <div className="flex items-center justify-center gap-4 text-sm">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
+                <span className="text-cyan-400 font-bold">A</span>
+              </div>
+              <span className="text-gray-400">Analyst</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-green-400 text-xs mb-1">$0.001</span>
+              <ArrowRight className="text-green-400" />
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
+                <span className="text-blue-400 font-bold">S</span>
+              </div>
+              <span className="text-gray-400">Scout</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-green-400 text-xs mb-1">$0.001</span>
+              <ArrowRight className="text-green-400" />
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-purple-500/20 border-2 border-purple-500 flex items-center justify-center mb-2">
+                <span className="text-purple-400 font-bold">P</span>
+              </div>
+              <span className="text-gray-400">Policy</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-green-400 text-xs mb-1">$0.001</span>
+              <ArrowRight className="text-green-400" />
+            </div>
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
+                <span className="text-cyan-400 font-bold">A</span>
+              </div>
+              <span className="text-gray-400">Analyst</span>
+            </div>
+          </div>
+          <p className="text-center text-gray-500 text-xs mt-4">
+            Each agent pays $0.001 and receives $0.001 → Net change: $0.00
+          </p>
+        </div>
 
         <div className="grid grid-cols-2 gap-8">
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">How The Economy Works</h3>
-            <p className="text-gray-400 mb-4">
-              The Analyst is the customer who pays for URL discovery services. Scout discovers URLs and
-              pays Policy for authorization. All agents share the same treasury—money circulates internally.
-            </p>
+            <h3 className="text-lg font-semibold text-white mb-4">Payment Breakdown</h3>
             <div className="bg-gray-800/50 rounded-lg p-4 space-y-2 text-sm">
               <div className="flex justify-between text-gray-400">
-                <span>Analyst pays Scout:</span>
-                <span className="text-green-400">0.0003 USDC/URL → Treasury</span>
+                <span>Analyst → Scout:</span>
+                <span className="text-green-400">$0.001 (discovery)</span>
               </div>
               <div className="flex justify-between text-gray-400">
-                <span>Scout pays Policy:</span>
-                <span className="text-green-400">0.001 USDC → Treasury</span>
+                <span>Scout → Policy:</span>
+                <span className="text-green-400">$0.001 (authorization)</span>
               </div>
               <div className="flex justify-between text-gray-400">
-                <span>Net USDC change:</span>
-                <span className="text-cyan-400 font-bold">$0.00</span>
+                <span>Policy → Analyst:</span>
+                <span className="text-green-400">$0.001 (feedback)</span>
               </div>
               <div className="border-t border-gray-700 pt-2 flex justify-between text-gray-400">
+                <span>Net per agent:</span>
+                <span className="text-cyan-400 font-bold">$0.00</span>
+              </div>
+              <div className="flex justify-between text-gray-400">
                 <span>Only real cost:</span>
-                <span className="text-yellow-400">~$0.002 gas per batch</span>
+                <span className="text-yellow-400">~$0.003 gas (3 txns)</span>
               </div>
             </div>
           </div>
@@ -341,10 +387,10 @@ let proof = jolt_atlas::prove(
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">Why This Matters</h3>
             <ul className="space-y-3 text-gray-400">
-              <FeatureItem text="Runs Forever: 1 USDC treasury can fund unlimited batches" />
-              <FeatureItem text="Only Gas Costs: ~$3 of ETH funds thousands of batches on Base" />
-              <FeatureItem text="Real Payments: The x402 protocol is fully functional, not simulated" />
-              <FeatureItem text="Extensible: External customers could pay for API access to fund operations" />
+              <FeatureItem text="True Circular Economy: USDC flows in a loop, never depletes" />
+              <FeatureItem text="Separate Wallets: Each agent owns its funds independently" />
+              <FeatureItem text="Only Gas Costs: ~$3 of ETH runs thousands of batches" />
+              <FeatureItem text="Proof-Gated: Every payment requires valid zkML proof first" />
             </ul>
           </div>
         </div>
