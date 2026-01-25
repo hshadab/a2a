@@ -142,23 +142,37 @@ export default function AboutPage() {
         {/* x402 Protocol */}
         <TechSection
           icon={<DollarSign className="text-green-400" size={32} />}
-          title="x402 Payment Protocol"
+          title="x402 Payment Protocol v2"
           subtitle="HTTP 402 + Coinbase Facilitator"
           color="#22c55e"
           links={[
-            { label: 'x402 Specification', url: 'https://www.x402.org/' },
+            { label: 'x402 v2 Spec', url: 'https://www.x402.org/writing/x402-v2-launch' },
             { label: 'Coinbase Developer Docs', url: 'https://docs.cdp.coinbase.com/x402/docs/welcome' },
           ]}
         >
           <p className="text-gray-300 mb-4">
-            x402 brings the HTTP 402 "Payment Required" status code to life. It enables
-            machine-to-machine payments where APIs can request payment before providing services —
-            perfect for autonomous agent economies.
+            x402 brings the HTTP 402 "Payment Required" status code to life. ThreatProof implements
+            <strong className="text-green-400"> x402 v2</strong> with standardized headers, base64-encoded payloads,
+            and backwards compatibility with v1 clients.
           </p>
 
-          {/* Coinbase Facilitator Box */}
+          {/* v2 Features Box */}
           <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4">
             <h5 className="text-green-400 font-medium mb-2 flex items-center gap-2">
+              <Zap size={16} />
+              x402 v2 Features
+            </h5>
+            <ul className="text-sm text-gray-400 space-y-1">
+              <FeatureItem text="PAYMENT-REQUIRED header: Base64-encoded payment options" />
+              <FeatureItem text="X-PAYMENT header: Client sends payment proof" />
+              <FeatureItem text="Amount in base units: 1000000 = 1 USDC (6 decimals)" />
+              <FeatureItem text="Multiple payment options: 'accepts' array for flexibility" />
+            </ul>
+          </div>
+
+          {/* Coinbase Facilitator Box */}
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
+            <h5 className="text-blue-400 font-medium mb-2 flex items-center gap-2">
               <Zap size={16} />
               Coinbase x402 Facilitator
             </h5>
@@ -175,44 +189,39 @@ export default function AboutPage() {
             <FeatureItem text="Pay-per-Request: Scout pays 0.001 USDC per authorization, 0.0005 USDC per URL classification" />
             <FeatureItem text="USDC on Base: Fast, cheap transactions (~$0.001 gas) on Coinbase's L2" />
             <FeatureItem text="CAIP-2 Chains: Standard chain identifiers in payment challenges" />
-            <FeatureItem text="Transparent Pricing: Costs declared upfront in agent cards with chain info" />
+            <FeatureItem text="Backwards Compatible: Supports both v1 (X-402-*) and v2 (X-PAYMENT) headers" />
           </ul>
 
-          <CodeBlock title="x402 Payment Challenge (CAIP-2)" code={`// HTTP 402 Response
+          <CodeBlock title="x402 v2 Payment Challenge" code={`// HTTP 402 Response
+// Header: PAYMENT-REQUIRED: <base64 encoded JSON>
 {
-  "version": "1",
-  "amount": "0.025",
-  "currency": "USDC",
-  "recipient": "0x6c67...",
-  "chain": "eip155:8453",  // CAIP-2 format
-  "chain_id": 8453,
-  "token_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  "expires": 1706234567,
-  "nonce": "abc123..."
+  "x402Version": 2,
+  "accepts": [{
+    "scheme": "exact",
+    "network": "base-mainnet",
+    "maxAmountRequired": "25000",  // 0.025 USDC in base units
+    "resource": "/skills/classify-urls",
+    "description": "Classify 50 URLs",
+    "payTo": "0x6c67...",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "maxTimeoutSeconds": 300
+  }]
 }`} />
 
-          <CodeBlock title="JSON-RPC with Payment" code={`// POST /a2a (with payment)
-{
-  "jsonrpc": "2.0",
-  "method": "task/send",
-  "params": {
-    "skillId": "classify-urls",
-    "input": { "urls": [...] },
-    "paymentReceipt": "0xabc123..."
-  },
-  "id": "1"
-}
+          <CodeBlock title="x402 v2 Payment Flow" code={`// 1. Client sends request
+GET /skills/classify-urls
 
-// Response
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "id": "task-456",
-    "state": "completed",
-    "output": { "results": [...] }
-  },
-  "id": "1"
-}`} />
+// 2. Server responds 402 with PAYMENT-REQUIRED header
+HTTP/1.1 402 Payment Required
+PAYMENT-REQUIRED: eyJ4NDAyVmVyc2lvbiI6MiwiYWNjZXB0cyI6...
+
+// 3. Client makes payment, retries with X-PAYMENT header
+POST /skills/classify-urls
+X-PAYMENT: 0xabc123...  // Transaction hash
+
+// 4. Server verifies payment, returns result
+HTTP/1.1 200 OK
+X-PAYMENT-RESPONSE: verified`} />
         </TechSection>
 
         {/* Jolt Atlas zkML */}

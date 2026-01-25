@@ -29,7 +29,10 @@ from shared.events import (
     emit_analyst_processing, emit_analyst_proving, emit_analyst_response
 )
 from shared.a2a import build_agent_card, build_skill, build_agent_card_v3, build_skill_v3
-from shared.x402 import PaymentRequired, require_payment, get_payment_from_header, X402Client
+from shared.x402 import (
+    PaymentRequired, require_payment, get_payment_from_header, X402Client,
+    HEADER_PAYMENT_SIGNATURE, HEADER_X402_RECEIPT
+)
 from shared.prover import classifier_prover, compute_commitment
 from shared.logging_config import analyst_logger as logger
 from shared.jsonrpc import JSONRPCRouter, create_jsonrpc_endpoint, TaskNotFoundError, PaymentRequiredError as JSONRPCPaymentRequired
@@ -355,35 +358,42 @@ async def debug_prover():
 @app.post("/skills/classify-urls")
 async def classify_urls(
     request: ClassifyRequest,
-    x_402_receipt: Optional[str] = Header(None, alias="X-402-Receipt")
+    http_request: Request,
+    x_402_receipt: Optional[str] = Header(None, alias="X-402-Receipt"),
+    x_payment: Optional[str] = Header(None, alias="X-PAYMENT")
 ) -> ClassifyResponse:
     """
     Classify URLs with zkML proof.
 
-    Requires x402 payment.
+    Requires x402 payment (supports both v1 and v2).
+    - v2: X-PAYMENT header
+    - v1: X-402-Receipt header
     """
     # Calculate required payment
     required_amount = analyst_agent.calculate_price(len(request.urls))
 
-    # Check for payment
-    if not x_402_receipt:
+    # Check for payment (v2 header takes priority)
+    payment_receipt = x_payment or x_402_receipt or get_payment_from_header(http_request)
+
+    if not payment_receipt:
         raise PaymentRequired(
             amount=required_amount,
             recipient=analyst_agent.wallet_address,
-            memo=f"classify-{request.batch_id}"
+            resource="/skills/classify-urls",
+            description=f"Classify {len(request.urls)} URLs for batch {request.batch_id}"
         )
 
     # Verify payment
     try:
         is_valid, error = analyst_agent.x402_client.verify_payment(
-            tx_hash=x_402_receipt,
+            tx_hash=payment_receipt,
             expected_recipient=analyst_agent.wallet_address,
             expected_amount_usdc=required_amount * 0.99  # Allow small tolerance
         )
 
         if not is_valid:
             # For demo, allow simulated payments
-            if x_402_receipt != "simulated":
+            if payment_receipt != "simulated":
                 logger.warning(f"Payment verification warning: {error}")
     except (ConnectionError, ValueError) as e:
         logger.warning(f"Payment verification error (continuing): {e}")
@@ -405,10 +415,12 @@ async def classify_urls(
 @app.post("/classify")
 async def classify(
     request: ClassifyRequest,
-    x_402_receipt: Optional[str] = Header(None, alias="X-402-Receipt")
+    http_request: Request,
+    x_402_receipt: Optional[str] = Header(None, alias="X-402-Receipt"),
+    x_payment: Optional[str] = Header(None, alias="X-PAYMENT")
 ) -> ClassifyResponse:
-    """Alias for classify-urls"""
-    return await classify_urls(request, x_402_receipt)
+    """Alias for classify-urls (supports x402 v1 and v2)"""
+    return await classify_urls(request, http_request, x_402_receipt, x_payment)
 
 
 @app.post("/extract-features")

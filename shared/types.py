@@ -133,7 +133,7 @@ class PaymentReceipt(BaseModel):
 
 
 class X402PaymentChallenge(BaseModel):
-    """x402 Payment Required response"""
+    """x402 v1 Payment Required response (legacy)"""
     version: str = "1"
     amount: str
     currency: str = "USDC"
@@ -143,6 +143,25 @@ class X402PaymentChallenge(BaseModel):
     token_address: str
     expires: int
     nonce: str
+
+
+class X402PaymentRequirement(BaseModel):
+    """x402 v2 payment requirement (single payment option)"""
+    scheme: str = "exact"  # "exact" or "up-to"
+    network: str = "base-mainnet"  # Network identifier
+    maxAmountRequired: str  # Amount in base units (e.g., "1000" = 0.001 USDC)
+    resource: str  # Resource path being paid for
+    description: Optional[str] = None  # Human-readable description
+    payTo: str  # Recipient address
+    asset: str  # Token contract address
+    maxTimeoutSeconds: int = 300  # Payment deadline
+
+
+class X402PaymentRequired(BaseModel):
+    """x402 v2 Payment Required response structure"""
+    x402Version: int = 2
+    accepts: List[X402PaymentRequirement]
+    error: Optional[str] = None
 
 
 # ============ A2A Types ============

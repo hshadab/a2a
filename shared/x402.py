@@ -2,13 +2,17 @@
 x402 Payment Protocol Implementation for Base Mainnet
 
 Implements HTTP 402 Payment Required flow with USDC on Base.
+Supports x402 v2 specification with PAYMENT-REQUIRED headers.
 Supports both direct payments and Coinbase Facilitator.
+
+x402 v2 spec: https://www.x402.org/writing/x402-v2-launch
 """
 import json
 import time
 import hashlib
 import httpx
-from typing import Optional, Tuple, Dict, Any
+import base64
+from typing import Optional, Tuple, Dict, Any, List
 from decimal import Decimal
 from datetime import datetime
 
@@ -19,7 +23,26 @@ from eth_account import Account
 from eth_account.signers.local import LocalAccount
 
 from .config import config
-from .types import PaymentRequest, PaymentReceipt, X402PaymentChallenge
+from .types import (
+    PaymentRequest, PaymentReceipt, X402PaymentChallenge,
+    X402PaymentRequired, X402PaymentRequirement
+)
+
+
+# ============ x402 v2 Header Constants ============
+
+# v2 headers (preferred)
+HEADER_PAYMENT_REQUIRED = "PAYMENT-REQUIRED"  # Server -> Client: payment instructions
+HEADER_PAYMENT_SIGNATURE = "X-PAYMENT"  # Client -> Server: payment proof
+HEADER_PAYMENT_RESPONSE = "X-PAYMENT-RESPONSE"  # Server -> Client: confirmation
+
+# v1 headers (legacy, for backwards compatibility)
+HEADER_X402_VERSION = "X-402-Version"
+HEADER_X402_PAYMENT = "X-402-Payment"
+HEADER_X402_RECEIPT = "X-402-Receipt"
+
+# Current protocol version
+X402_VERSION = 2
 
 
 # USDC has 6 decimals
@@ -217,13 +240,14 @@ class X402Client:
 
 class PaymentRequired(HTTPException):
     """
-    HTTP 402 Payment Required exception.
+    HTTP 402 Payment Required exception (x402 v2).
 
     Usage:
         raise PaymentRequired(
             amount=1.50,
             recipient="0x...",
-            memo="classify-50-urls"
+            resource="/skills/classify-urls",
+            description="URL classification service"
         )
     """
 
@@ -231,16 +255,48 @@ class PaymentRequired(HTTPException):
         self,
         amount: float,
         recipient: str,
-        memo: str = "",
+        resource: str = "/api/resource",
+        description: str = "",
+        memo: str = "",  # Legacy parameter, maps to description
         expires_in: int = 300  # 5 minutes
     ):
-        nonce = hashlib.sha256(f"{time.time()}{memo}".encode()).hexdigest()[:16]
+        # Use memo as description if description not provided (backwards compat)
+        if not description and memo:
+            description = memo
 
+        # Convert amount to base units (USDC has 6 decimals)
+        amount_base_units = str(int(amount * 1_000_000))
+
+        # Build v2 payment requirement
+        requirement = X402PaymentRequirement(
+            scheme="exact",
+            network="base-mainnet",
+            maxAmountRequired=amount_base_units,
+            resource=resource,
+            description=description or f"Payment for {resource}",
+            payTo=recipient,
+            asset=config.usdc_address,
+            maxTimeoutSeconds=expires_in
+        )
+
+        self.payment_required = X402PaymentRequired(
+            x402Version=X402_VERSION,
+            accepts=[requirement],
+            error="Payment required"
+        )
+
+        # Encode as base64 for header
+        payload_json = json.dumps(self.payment_required.model_dump())
+        payload_b64 = base64.b64encode(payload_json.encode()).decode()
+
+        # Also maintain v1 compatibility
+        nonce = hashlib.sha256(f"{time.time()}{description}".encode()).hexdigest()[:16]
         self.challenge = X402PaymentChallenge(
             amount=str(amount),
             currency="USDC",
             recipient=recipient,
             chain_id=config.base_chain_id,
+            chain=config.base_chain_caip2,
             token_address=config.usdc_address,
             expires=int(time.time()) + expires_in,
             nonce=nonce
@@ -250,16 +306,36 @@ class PaymentRequired(HTTPException):
             status_code=402,
             detail="Payment Required",
             headers={
-                "X-402-Version": "1",
-                "X-402-Payment": json.dumps(self.challenge.model_dump()),
+                # v2 header (primary)
+                HEADER_PAYMENT_REQUIRED: payload_b64,
+                # v1 headers (backwards compatibility)
+                HEADER_X402_VERSION: str(X402_VERSION),
+                HEADER_X402_PAYMENT: json.dumps(self.challenge.model_dump()),
                 "Content-Type": "application/json"
             }
         )
 
 
 def get_payment_from_header(request: Request) -> Optional[str]:
-    """Extract payment receipt (tx hash) from request header"""
-    return request.headers.get("X-402-Receipt")
+    """
+    Extract payment receipt (tx hash) from request header.
+
+    Supports both x402 v2 (X-PAYMENT) and v1 (X-402-Receipt) headers.
+    """
+    # Try v2 header first
+    payment = request.headers.get(HEADER_PAYMENT_SIGNATURE)
+    if payment:
+        # v2 format might be "type=ethereum txhash=0x..."
+        if "txhash=" in payment.lower():
+            # Extract txhash from v2 format
+            for part in payment.split():
+                if part.lower().startswith("txhash="):
+                    return part.split("=", 1)[1]
+        # Or it might just be the tx hash directly
+        return payment
+
+    # Fall back to v1 header
+    return request.headers.get(HEADER_X402_RECEIPT)
 
 
 async def require_payment(
@@ -313,17 +389,54 @@ async def require_payment(
 def create_payment_response(
     amount: float,
     recipient: str,
-    memo: str = ""
+    resource: str = "/api/resource",
+    description: str = ""
 ) -> JSONResponse:
-    """Create a 402 Payment Required response"""
-    nonce = hashlib.sha256(f"{time.time()}{memo}".encode()).hexdigest()[:16]
+    """
+    Create a 402 Payment Required response (x402 v2).
 
-    challenge = X402PaymentChallenge(
+    Args:
+        amount: Amount in USDC
+        recipient: Recipient address
+        resource: Resource path being paid for
+        description: Human-readable description
+
+    Returns:
+        JSONResponse with 402 status and payment headers
+    """
+    # Convert amount to base units (USDC has 6 decimals)
+    amount_base_units = str(int(amount * 1_000_000))
+
+    # Build v2 payment requirement
+    requirement = X402PaymentRequirement(
+        scheme="exact",
+        network="base-mainnet",
+        maxAmountRequired=amount_base_units,
+        resource=resource,
+        description=description or f"Payment for {resource}",
+        payTo=recipient,
+        asset=config.usdc_address,
+        maxTimeoutSeconds=300
+    )
+
+    payment_required = X402PaymentRequired(
+        x402Version=X402_VERSION,
+        accepts=[requirement],
+        error=None
+    )
+
+    # Encode as base64 for header
+    payload_json = json.dumps(payment_required.model_dump())
+    payload_b64 = base64.b64encode(payload_json.encode()).decode()
+
+    # Also create v1 challenge for backwards compatibility
+    nonce = hashlib.sha256(f"{time.time()}{description}".encode()).hexdigest()[:16]
+    challenge_v1 = X402PaymentChallenge(
         amount=str(amount),
         currency="USDC",
         recipient=recipient,
         chain_id=config.base_chain_id,
-        chain=config.base_chain_caip2,  # CAIP-2 format
+        chain=config.base_chain_caip2,
         token_address=config.usdc_address,
         expires=int(time.time()) + 300,
         nonce=nonce
@@ -331,10 +444,20 @@ def create_payment_response(
 
     return JSONResponse(
         status_code=402,
-        content={"detail": "Payment Required", "payment": challenge.model_dump()},
+        content={
+            "detail": "Payment Required",
+            "x402Version": X402_VERSION,
+            "accepts": [requirement.model_dump()],
+            # v1 compatibility
+            "payment": challenge_v1.model_dump()
+        },
         headers={
-            "X-402-Version": "1",
-            "X-402-Payment": json.dumps(challenge.model_dump())
+            # v2 header (primary)
+            HEADER_PAYMENT_REQUIRED: payload_b64,
+            # v1 headers (backwards compatibility)
+            HEADER_X402_VERSION: str(X402_VERSION),
+            HEADER_X402_PAYMENT: json.dumps(challenge_v1.model_dump()),
+            "Content-Type": "application/json"
         }
     )
 
