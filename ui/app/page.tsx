@@ -115,14 +115,14 @@ export default function Dashboard() {
           icon={<DollarSign className="text-yellow-400" />}
         />
         <StatCard
-          label="Policy Paid"
+          label="Scout → Policy"
           value={stats ? formatUSDC(stats.policy_paid_usdc) : '-'}
           subtext="Authorization proofs"
         />
         <StatCard
-          label="Analyst Paid"
+          label="Analyst → Scout"
           value={stats ? formatUSDC(stats.analyst_paid_usdc) : '-'}
-          subtext="Classification proofs"
+          subtext="URL discovery"
         />
         <StatCard
           label="Cost per URL"
@@ -168,7 +168,7 @@ export default function Dashboard() {
               <span className="text-sm font-medium text-cyan-400">Discover</span>
             </div>
             <p className="text-xs text-gray-400">
-              Scout Agent autonomously discovers URLs from threat feeds and pays Policy Agent for authorization decisions.
+              Analyst requests URLs from Scout, who discovers threats from feeds and pays Policy for authorization.
             </p>
           </div>
           <div className="space-y-2">
@@ -177,7 +177,7 @@ export default function Dashboard() {
               <span className="text-sm font-medium text-green-400">Pay & Verify</span>
             </div>
             <p className="text-xs text-gray-400">
-              Agents exchange USDC via x402 protocol. Every payment triggers zkML proof generation to verify honest work.
+              Proof-gated payments: work is verified with zkML proofs before USDC is released via x402 protocol.
             </p>
           </div>
           <div className="space-y-2">

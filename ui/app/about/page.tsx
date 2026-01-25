@@ -53,21 +53,21 @@ export default function AboutPage() {
           />
         </div>
 
-        {/* Flow Diagram */}
+        {/* Flow Diagram - Value Chain */}
         <div className="bg-gray-800/50 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Data Flow</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">Value Chain Payment Flow</h3>
           <div className="flex items-center justify-between text-sm">
-            <FlowStep number={1} text="Scout finds URLs" />
+            <FlowStep number={1} text="Analyst requests URLs from Scout" />
             <ArrowRight className="text-gray-600" />
-            <FlowStep number={2} text="Policy authorizes + proof" />
+            <FlowStep number={2} text="Scout discovers URLs" />
             <ArrowRight className="text-gray-600" />
-            <FlowStep number={3} text="Scout pays Policy (USDC)" />
+            <FlowStep number={3} text="Scout gets Policy authorization + proof" />
             <ArrowRight className="text-gray-600" />
-            <FlowStep number={4} text="Analyst classifies + proof" />
+            <FlowStep number={4} text="Scout pays Policy (USDC)" />
             <ArrowRight className="text-gray-600" />
-            <FlowStep number={5} text="Scout pays Analyst (USDC)" />
+            <FlowStep number={5} text="Analyst pays Scout (USDC)" />
             <ArrowRight className="text-gray-600" />
-            <FlowStep number={6} text="Results stored with proofs" />
+            <FlowStep number={6} text="Analyst classifies + stores" />
           </div>
         </div>
       </section>
@@ -101,42 +101,42 @@ export default function AboutPage() {
             <FeatureItem text="CAIP-2 Chains: Standard chain identifiers (eip155:8453 for Base)" />
           </ul>
 
-          <CodeBlock title="A2A v0.3 Agent Card" code={`// GET /.well-known/agent.json
+          <CodeBlock title="A2A v0.3 Agent Card (Scout)" code={`// GET /.well-known/agent.json
 {
-  "name": "Analyst Agent",
+  "name": "Threat Scout",
   "protocolVersion": "0.3",
   "capabilities": {
     "streaming": false,
     "stateTransitionHistory": true
   },
   "skills": [{
-    "id": "classify-urls",
-    "tags": ["classification", "phishing", "zkml"],
+    "id": "discover-urls",
+    "tags": ["discovery", "threat-intel", "zkml"],
     "inputModes": ["application/json"],
     "outputModes": ["application/json"],
     "price": {
-      "amount": "0.0005",
+      "amount": "0.0003",
       "currency": "USDC",
       "chain": "eip155:8453"
     }
   }]
 }`} />
 
-          <CodeBlock title="JSON-RPC 2.0 Request" code={`// POST /a2a
+          <CodeBlock title="JSON-RPC 2.0 Request (Analyst → Scout)" code={`// POST /a2a (Analyst requests URL discovery from Scout)
 {
   "jsonrpc": "2.0",
   "method": "task/send",
   "params": {
-    "skillId": "classify-urls",
+    "skillId": "discover-urls",
     "input": {
-      "batch_id": "abc123",
-      "urls": ["https://example.com"],
-      "policy_proof_hash": "0x..."
-    },
-    "paymentReceipt": "0x..."
+      "batch_size": 50,
+      "source": "phishtank"
+    }
   },
   "id": "req-1"
-}`} />
+}
+// Scout returns URLs + authorization proof + payment_due
+// Analyst verifies proof, then pays Scout`} />
         </TechSection>
 
         {/* x402 Protocol */}
@@ -186,9 +186,9 @@ export default function AboutPage() {
 
           <h4 className="text-white font-semibold mb-2">How ThreatProof Uses x402:</h4>
           <ul className="space-y-2 text-gray-400">
-            <FeatureItem text="Pay-per-Request: Scout pays 0.001 USDC per authorization, 0.0005 USDC per URL classification" />
+            <FeatureItem text="Value Chain: Analyst pays Scout (0.0003 USDC/URL), Scout pays Policy (0.001 USDC/auth)" />
             <FeatureItem text="USDC on Base: Fast, cheap transactions (~$0.001 gas) on Coinbase's L2" />
-            <FeatureItem text="CAIP-2 Chains: Standard chain identifiers in payment challenges" />
+            <FeatureItem text="Proof-Gated: Work must be verified before payment is released" />
             <FeatureItem text="Backwards Compatible: Supports both v1 (X-402-*) and v2 (X-PAYMENT) headers" />
           </ul>
 
@@ -315,17 +315,17 @@ let proof = jolt_atlas::prove(
           <div>
             <h3 className="text-lg font-semibold text-white mb-4">How The Economy Works</h3>
             <p className="text-gray-400 mb-4">
-              All three agents share the same treasury wallet. When Scout "pays" Policy or Analyst,
-              the USDC moves from the treasury... back to the treasury. The money circulates internally.
+              The Analyst is the customer who pays for URL discovery services. Scout discovers URLs and
+              pays Policy for authorization. All agents share the same treasury—money circulates internally.
             </p>
             <div className="bg-gray-800/50 rounded-lg p-4 space-y-2 text-sm">
               <div className="flex justify-between text-gray-400">
-                <span>Scout pays Policy:</span>
-                <span className="text-green-400">0.001 USDC → Treasury</span>
+                <span>Analyst pays Scout:</span>
+                <span className="text-green-400">0.0003 USDC/URL → Treasury</span>
               </div>
               <div className="flex justify-between text-gray-400">
-                <span>Scout pays Analyst:</span>
-                <span className="text-green-400">0.025 USDC → Treasury</span>
+                <span>Scout pays Policy:</span>
+                <span className="text-green-400">0.001 USDC → Treasury</span>
               </div>
               <div className="flex justify-between text-gray-400">
                 <span>Net USDC change:</span>
@@ -333,7 +333,7 @@ let proof = jolt_atlas::prove(
               </div>
               <div className="border-t border-gray-700 pt-2 flex justify-between text-gray-400">
                 <span>Only real cost:</span>
-                <span className="text-yellow-400">~$0.001 gas per batch</span>
+                <span className="text-yellow-400">~$0.002 gas per batch</span>
               </div>
             </div>
           </div>
