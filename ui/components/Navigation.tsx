@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Info, Shield, Fuel, Wallet, ExternalLink, Cpu, History } from 'lucide-react';
+import { Activity, Info, Shield, Fuel, Wallet, ExternalLink, Cpu, History, Banknote } from 'lucide-react';
 
 interface Balance {
   usdc: number;
@@ -96,17 +96,13 @@ export default function Navigation() {
                 alt="Novanet"
                 className="h-8 w-auto"
               />
-              <span className="text-gray-600 text-xl">|</span>
               <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 ThreatProof
               </span>
             </Link>
-            <span className="text-gray-600 text-lg">|</span>
-            <span className="text-sm text-gray-400">
+            <div className="flex items-center gap-2 text-sm">
               <span className="text-cyan-400">Google A2A</span>
-              {' + '}
               <span className="text-green-400">x402</span>
-              {' + '}
               <a
                 href="https://github.com/ICME-Lab/jolt-atlas"
                 target="_blank"
@@ -115,7 +111,7 @@ export default function Navigation() {
               >
                 Jolt Atlas zkML
               </a>
-            </span>
+            </div>
           </div>
 
           {/* Status Indicators */}
@@ -157,7 +153,7 @@ export default function Navigation() {
           <div className="flex items-center gap-5">
             {/* USDC Balance */}
             <div className="flex items-center gap-2">
-              <span className="text-lg">💵</span>
+              <Banknote size={18} className="text-green-400" />
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-gray-500 uppercase">Treasury</span>
                 <span className="text-base text-green-400 font-mono font-bold">
@@ -165,8 +161,6 @@ export default function Navigation() {
                 </span>
               </div>
             </div>
-
-            <span className="text-gray-700 text-lg">|</span>
 
             {/* ETH Balance */}
             <div className="flex items-center gap-2">
@@ -179,8 +173,6 @@ export default function Navigation() {
               </div>
             </div>
 
-            <span className="text-gray-700 text-lg">|</span>
-
             {/* Runway */}
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-500 uppercase">Runway</span>
@@ -188,8 +180,6 @@ export default function Navigation() {
                 {loading ? '...' : `~${estimatedBatches.toLocaleString()} batches`}
               </span>
             </div>
-
-            <span className="text-gray-700 text-lg">|</span>
 
             {/* Basescan Link */}
             <a
@@ -205,14 +195,12 @@ export default function Navigation() {
           </div>
 
           {/* Economy info */}
-          <div className="flex items-center gap-3 text-xs text-gray-500">
+          <div className="flex items-center gap-4 text-xs text-gray-500">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-green-500" />
               Self-sustaining
             </span>
-            <span className="text-gray-700">|</span>
             <span>Batches every 5 min</span>
-            <span className="text-gray-700">|</span>
             <span>USDC circulates internally, only gas consumed</span>
           </div>
         </div>

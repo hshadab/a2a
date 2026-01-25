@@ -39,10 +39,10 @@ export default function AboutPage() {
           />
           <AgentBox
             icon={<Scale size={24} />}
-            name="Spending Policy"
-            role="Proof of Authorization"
+            name="Spending Approval"
+            role="Proof of Correct Approval"
             color="#a855f7"
-            description="Authorizes spending on URL classification. Generates zkML proofs that the budget decision followed the policy rules."
+            description="Approves spending on URL classification. Generates zkML proofs that the approval decision was computed correctly."
           />
           <AgentBox
             icon={<Microscope size={24} />}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Activity, Shield, Zap, DollarSign, ArrowRight } from 'lucide-react';
+import { Activity, Shield, Zap, DollarSign, ArrowRight, Search, Scale, Microscope, Coins, Check, X } from 'lucide-react';
 import ProofCard from './ProofCard';
 import VerificationChecklist from './VerificationChecklist';
 
@@ -242,7 +242,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       case 'POLICY_RESPONSE':
         return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}%)`;
       case 'POLICY_VERIFIED':
-        return `Proof verified`;
+        return event.data.valid !== false ? 'Proof verified' : 'Proof FAILED';
       case 'ANALYST_PROCESSING':
         return `Classifying ${event.data.url_count} URLs`;
       case 'ANALYST_PROVING':
@@ -250,7 +250,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       case 'ANALYST_RESPONSE':
         return `${event.data.phishing_count} phishing found`;
       case 'WORK_VERIFIED':
-        return 'Work proof verified';
+        return event.data.valid !== false ? 'Work proof verified' : 'Work proof FAILED';
       case 'DATABASE_UPDATED':
         return `+${event.data.urls_added} URLs saved`;
       default:
@@ -338,13 +338,6 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
             filter={activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
           />
 
-          {/* Central data flow indicator */}
-          <g className="bi-flow">
-            <text x="33" y="38" fontSize="2" fill="#3b82f6" opacity="0.7">DATA</text>
-            <text x="33" y="53" fontSize="2" fill="#22d3ee" opacity="0.7">PROOF</text>
-            <text x="66" y="38" fontSize="2" fill="#a855f7" opacity="0.7">URLs</text>
-            <text x="66" y="53" fontSize="2" fill="#22d3ee" opacity="0.7">RESULT</text>
-          </g>
         </svg>
 
         {/* Payment Annotation Overlay */}
@@ -352,7 +345,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 float-annotation">
             <div className="bg-green-500/20 border border-green-500/50 rounded-lg px-3 py-1.5 backdrop-blur-sm">
               <div className="flex items-center gap-2 text-green-400">
-                <span className="coin-flip">💰</span>
+                <Coins size={16} className="text-green-400" />
                 <span className="font-mono text-sm font-bold">{currentPayment.amount.toFixed(4)} USDC</span>
               </div>
             </div>
@@ -393,8 +386,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         <AgentCard
           name="Threat Scout"
           role="URL Discovery"
-          icon={<Activity size={24} />}
-          emoji="🔭"
+          icon={<Search size={24} />}
           color="blue"
           colorHex="#3b82f6"
           state={agentStates.scout}
@@ -412,10 +404,9 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
         {/* Policy Agent */}
         <AgentCard
-          name="Spending Policy"
-          role="Budget Authorization"
-          icon={<Shield size={24} />}
-          emoji="⚖️"
+          name="Spending Approval"
+          role="Proof of Correct Approval"
+          icon={<Scale size={24} />}
           color="purple"
           colorHex="#a855f7"
           state={agentStates.policy}
@@ -434,9 +425,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         {/* Analyst Agent */}
         <AgentCard
           name="URL Classifier"
-          role="Threat Analysis"
-          icon={<Zap size={24} />}
-          emoji="🔬"
+          role="Proof of Analysis"
+          icon={<Microscope size={24} />}
           color="cyan"
           colorHex="#22d3ee"
           state={agentStates.analyst}
@@ -523,7 +513,6 @@ function AgentCard({
   name,
   role,
   icon,
-  emoji,
   color,
   colorHex,
   state,
@@ -535,7 +524,6 @@ function AgentCard({
   name: string;
   role: string;
   icon: React.ReactNode;
-  emoji: string;
   color: string;
   colorHex: string;
   state: AgentState;
@@ -597,7 +585,7 @@ function AgentCard({
                   backgroundColor: `${colorHex}20`,
                 }}
               >
-                <span className="text-2xl">{emoji}</span>
+                <span style={{ color: colorHex }}>{icon}</span>
               </div>
 
               {/* Progress Ring SVG */}
@@ -718,7 +706,7 @@ function AgentCard({
                 <span className={i === 0 ? 'animate-pulse' : ''}>
                   {formatEvent(event)}
                   {i === 0 && event.type.includes('VERIFIED') && (
-                    <span className="ml-1 text-green-400">✓</span>
+                    <Check size={12} className="ml-1 text-green-400 inline" />
                   )}
                 </span>
               </div>
