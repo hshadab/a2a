@@ -49,6 +49,12 @@ from sources import (
     TyposquatSource
 )
 from shared.reputation import reputation_manager
+import httpx
+
+
+# ============ Pricing ============
+# Price for URL discovery service (paid by Analyst)
+DISCOVERY_PRICE_PER_URL = 0.0003  # $0.0003 per URL discovered
 
 
 # ============ Scout Agent ============
@@ -584,7 +590,7 @@ async def agent_card():
     """A2A v0.3 Agent Card"""
     return build_agent_card_v3(
         name="Scout Agent",
-        description="Discovers suspicious URLs and orchestrates threat intelligence gathering",
+        description="Discovers suspicious URLs from multiple threat sources with authorization proofs",
         url=config.scout_url,
         version="1.0.0",
         streaming=False,
@@ -592,16 +598,22 @@ async def agent_card():
         state_transition_history=True,
         provider="ThreatProof Network",
         documentation_url=f"{config.scout_url}/docs",
+        default_payment_address=config.treasury_address,
+        supported_payment_methods=["x402"],
         skills=[
             build_skill_v3(
                 skill_id="discover-urls",
                 name="URL Discovery",
-                description="Discover suspicious URLs from multiple sources including Certificate Transparency, typosquatting detection, and threat feeds",
+                description="Discover suspicious URLs from Certificate Transparency, typosquatting detection, and threat feeds. Returns URLs with Policy authorization proof.",
                 tags=["threat-intel", "url-discovery", "phishing", "security"],
                 input_modes=["application/json"],
                 output_modes=["application/json"],
-                price_amount=0,  # Scout is the initiator, no payment required
-                proof_required=False
+                price_amount=DISCOVERY_PRICE_PER_URL,
+                price_currency="USDC",
+                price_per="url",
+                chain=config.base_chain_caip2,
+                proof_required=True,  # Authorization proof included
+                model_commitment=None  # Policy model commitment returned in response
             )
         ]
     )
@@ -687,6 +699,184 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         broadcaster.disconnect(websocket)
+
+
+# ============ URL Discovery Service (for Value Chain Payments) ============
+
+from pydantic import BaseModel
+
+class DiscoverRequest(BaseModel):
+    """Request for URL discovery"""
+    limit: int = 50
+    requester_id: str = "analyst"
+
+
+class PaymentDue(BaseModel):
+    """Payment information for proof-gated payment flow"""
+    amount: float
+    currency: str = "USDC"
+    recipient: str
+    chain: str
+    memo: str
+
+
+class DiscoverResponse(BaseModel):
+    """Response from URL discovery service"""
+    batch_id: str
+    urls: List[str]
+    source: str
+    source_reputation: float
+    authorization_proof: str
+    authorization_proof_hash: str
+    policy_model_commitment: str
+    timestamp: str
+    payment_due: PaymentDue
+
+
+@app.post("/skills/discover-urls")
+async def discover_urls(request: DiscoverRequest) -> DiscoverResponse:
+    """
+    URL Discovery Service (Proof-Gated Payment Flow).
+
+    This endpoint provides URL discovery as a paid service.
+    Scout does the work upfront (proof-gated):
+    1. Discovers URLs from threat sources
+    2. Gets authorization from Policy Agent (Scout pays Policy)
+    3. Returns URLs + authorization proof + payment_due
+    4. Caller (Analyst) verifies the authorization proof
+    5. If valid, Caller pays Scout
+    6. If invalid, no payment
+
+    This is part of the Value Chain payment flow where:
+    - Analyst pays Scout for URL discovery
+    - Scout pays Policy for authorization
+    """
+    batch_id = str(uuid.uuid4())
+    logger.info(f"URL Discovery request: batch {batch_id}, limit={request.limit}")
+
+    # 1. Discover URLs from sources
+    urls, source_name, source_reputation = await scout._discover_urls()
+
+    if not urls:
+        raise HTTPException(
+            status_code=404,
+            detail="No new URLs discovered from sources"
+        )
+
+    # Limit URLs
+    urls = urls[:request.limit]
+    logger.info(f"Discovered {len(urls)} URLs from {source_name}")
+
+    # 2. Get current budget (for Policy authorization)
+    budget = await scout._get_budget()
+
+    # Calculate costs
+    policy_cost = config.policy_price_per_decision
+    discovery_cost = len(urls) * DISCOVERY_PRICE_PER_URL
+
+    # 3. Request authorization from Policy Agent
+    await emit_policy_requesting(batch_id, len(urls))
+
+    try:
+        auth_response = await scout._request_authorization(
+            batch_id=batch_id,
+            url_count=len(urls),
+            estimated_cost=discovery_cost,
+            budget_remaining=budget,
+            source_reputation=source_reputation
+        )
+    except Exception as e:
+        logger.error(f"Policy authorization failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Authorization failed: {e}")
+
+    if auth_response.get("decision") != "AUTHORIZED":
+        raise HTTPException(
+            status_code=403,
+            detail=f"Policy denied authorization: {auth_response.get('reason', 'Unknown')}"
+        )
+
+    # 4. Verify policy proof
+    policy_valid, verify_time = await scout._verify_policy_proof(auth_response)
+    await emit_policy_verified(batch_id, policy_valid, verify_time)
+
+    if not policy_valid:
+        raise HTTPException(
+            status_code=500,
+            detail="Policy proof verification failed"
+        )
+
+    # 5. Pay Policy Agent (Scout pays Policy as part of discovery service)
+    policy_receipt = await scout._pay_agent(config.policy_url, policy_cost, f"policy-{batch_id}")
+    logger.info(f"Paid Policy Agent: {policy_receipt.tx_hash if policy_receipt else 'simulated'}")
+
+    # 6. Return URLs with authorization proof and payment_due
+    payment_due = PaymentDue(
+        amount=discovery_cost,
+        currency="USDC",
+        recipient=config.treasury_address,
+        chain=config.base_chain_caip2,
+        memo=f"discover-{batch_id}"
+    )
+
+    return DiscoverResponse(
+        batch_id=batch_id,
+        urls=urls,
+        source=source_name,
+        source_reputation=source_reputation,
+        authorization_proof=auth_response.get("proof", ""),
+        authorization_proof_hash=auth_response.get("proof_hash", ""),
+        policy_model_commitment=auth_response.get("model_commitment", ""),
+        timestamp=datetime.utcnow().isoformat(),
+        payment_due=payment_due
+    )
+
+
+class ConfirmDiscoveryPaymentRequest(BaseModel):
+    """Request to confirm payment for URL discovery"""
+    batch_id: str
+    tx_hash: str
+    amount: float
+
+
+@app.post("/confirm-discovery-payment")
+async def confirm_discovery_payment(request: ConfirmDiscoveryPaymentRequest):
+    """
+    Confirm payment received for URL discovery.
+
+    Called by Analyst after:
+    1. Receiving discovered URLs + authorization proof
+    2. Verifying the authorization proof is valid
+    3. Making the USDC payment to Scout
+
+    This allows Scout to track earnings from URL discovery service.
+    """
+    # Verify payment if in production mode
+    if config.production_mode and request.tx_hash != "simulated":
+        try:
+            tolerance = 1 - config.payment_tolerance
+            is_valid, error = scout.x402_client.verify_payment(
+                tx_hash=request.tx_hash,
+                expected_recipient=config.treasury_address,
+                expected_amount_usdc=request.amount * tolerance
+            )
+            if not is_valid:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Payment verification failed: {error}"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Payment verification error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    logger.info(f"Discovery payment confirmed for batch {request.batch_id}: ${request.amount} USDC (tx: {request.tx_hash})")
+
+    return {
+        "status": "confirmed",
+        "batch_id": request.batch_id,
+        "amount": request.amount
+    }
 
 
 if __name__ == "__main__":

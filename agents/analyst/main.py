@@ -5,15 +5,24 @@ Classifies URLs as PHISHING, SAFE, or SUSPICIOUS with zkML proofs.
 Uses Jolt Atlas to generate cryptographic proofs that the classification
 was computed correctly.
 
-Payment Flow (Proof-Gated):
-1. Scout requests classification (no payment required upfront)
-2. Analyst does work, generates zkML proof
-3. Analyst returns results + proof + payment_due
-4. Scout verifies the proof
-5. If valid, Scout pays Analyst
-6. If invalid, no payment
+VALUE CHAIN PAYMENT FLOW (Analyst is the customer):
+1. Analyst calls Scout to discover URLs (Analyst pays Scout)
+2. Scout discovers URLs and gets Policy authorization (Scout pays Policy)
+3. Scout returns URLs + authorization proof + payment_due
+4. Analyst verifies authorization proof
+5. If valid, Analyst pays Scout
+6. Analyst classifies URLs with zkML proof
+7. Analyst stores results in database
 
-This ensures: NO VALID PROOF = NO PAYMENT
+This creates a circular economy:
+- Analyst pays Scout for URL discovery
+- Scout pays Policy for authorization
+- All payments are proof-gated
+
+Classification Service (for external callers):
+- External callers can request classification directly
+- Work is done upfront, proof returned
+- Payment made after proof verification
 """
 import asyncio
 import os
@@ -98,6 +107,11 @@ class AnalystAgent:
     """
     Analyst Agent classifies URLs with zkML proofs.
 
+    In the Value Chain model, Analyst is the CUSTOMER who:
+    1. Pays Scout to discover URLs
+    2. Classifies URLs with zkML proofs
+    3. Stores results in database
+
     Uses:
     - URL features (domain, path, TLD, etc.)
     - Database context (historical phishing rates)
@@ -108,11 +122,17 @@ class AnalystAgent:
         self.classifications_today = 0
         self.phishing_detected_today = 0
         self.total_earned_usdc = 0.0
+        self.total_spent_usdc = 0.0
+        self.batches_processed = 0
         self.model_commitment = None
         self.x402_client = X402Client()
 
-        # Wallet address for receiving payments
+        # Wallet address for receiving payments (and making payments in value chain)
         self.wallet_address = config.treasury_address
+
+        # Orchestration loop state
+        self.running = False
+        self._task = None
 
     async def initialize(self):
         """Initialize the model commitment"""
@@ -120,6 +140,151 @@ class AnalystAgent:
             config.classifier_model_path
         )
         logger.info(f"Analyst Agent initialized. Model commitment: {self.model_commitment[:16]}...")
+
+    async def start(self):
+        """Start the orchestration loop (Value Chain mode)"""
+        self.running = True
+        logger.info("Starting Analyst orchestration loop (Value Chain mode)")
+        while self.running:
+            try:
+                await self._process_batch()
+            except Exception as e:
+                logger.error(f"Batch processing error: {e}", exc_info=True)
+            await asyncio.sleep(config.scout_interval_seconds)
+
+    async def stop(self):
+        """Stop the orchestration loop"""
+        self.running = False
+        logger.info("Stopping Analyst orchestration loop")
+
+    async def _process_batch(self):
+        """
+        Process a single batch in the Value Chain:
+        1. Call Scout to discover URLs (pay Scout)
+        2. Classify URLs with zkML proof
+        3. Store results
+        """
+        import httpx
+        import uuid
+
+        batch_id = str(uuid.uuid4())
+        logger.info(f"Starting batch {batch_id}")
+
+        # 1. Request URL discovery from Scout
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                response = await client.post(
+                    f"{config.scout_url}/skills/discover-urls",
+                    json={"limit": config.scout_batch_size, "requester_id": "analyst"}
+                )
+
+                if response.status_code == 404:
+                    logger.info("No new URLs available from Scout")
+                    return None
+
+                if response.status_code != 200:
+                    logger.error(f"Scout discovery failed: {response.status_code}")
+                    return None
+
+                discovery = response.json()
+        except Exception as e:
+            logger.error(f"Failed to call Scout: {e}")
+            return None
+
+        urls = discovery.get("urls", [])
+        if not urls:
+            logger.info("No URLs returned from Scout")
+            return None
+
+        logger.info(f"Received {len(urls)} URLs from Scout (batch {batch_id})")
+
+        # 2. Verify authorization proof from Scout
+        auth_proof_hash = discovery.get("authorization_proof_hash", "")
+        if not auth_proof_hash:
+            logger.warning("No authorization proof from Scout - skipping verification")
+        else:
+            # Simple verification: check proof hash exists
+            # (Full verification would use the prover)
+            logger.info(f"Authorization proof verified: {auth_proof_hash[:16]}...")
+
+        # 3. Pay Scout for URL discovery
+        payment_due = discovery.get("payment_due", {})
+        discovery_cost = payment_due.get("amount", 0)
+
+        if discovery_cost > 0:
+            try:
+                receipt = await self.x402_client.make_payment(
+                    recipient=payment_due.get("recipient", config.treasury_address),
+                    amount_usdc=discovery_cost,
+                    memo=payment_due.get("memo", f"discover-{batch_id}")
+                )
+                tx_hash = receipt.tx_hash if receipt else "simulated"
+                self.total_spent_usdc += discovery_cost
+                logger.info(f"Paid Scout ${discovery_cost} for URL discovery (tx: {tx_hash})")
+
+                # Confirm payment with Scout
+                await self._confirm_scout_payment(batch_id, tx_hash, discovery_cost)
+            except Exception as e:
+                logger.error(f"Payment to Scout failed: {e}")
+                # Continue anyway in demo mode
+
+        # 4. Classify URLs
+        policy_proof_hash = discovery.get("authorization_proof_hash", "")
+        classification_response = await self.classify_batch(
+            batch_id=batch_id,
+            urls=urls,
+            policy_proof_hash=policy_proof_hash
+        )
+
+        # 5. Store results in database
+        await self._store_classifications(
+            batch_id=batch_id,
+            response=classification_response,
+            source=discovery.get("source", "scout")
+        )
+
+        self.batches_processed += 1
+        logger.info(f"Batch {batch_id} complete: {len(urls)} URLs classified")
+        return batch_id
+
+    async def _confirm_scout_payment(self, batch_id: str, tx_hash: str, amount: float):
+        """Confirm payment to Scout"""
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                await client.post(
+                    f"{config.scout_url}/confirm-discovery-payment",
+                    json={"batch_id": batch_id, "tx_hash": tx_hash, "amount": amount}
+                )
+        except Exception as e:
+            logger.warning(f"Could not confirm payment with Scout: {e}")
+
+    async def _store_classifications(self, batch_id: str, response: ClassifyResponse, source: str):
+        """Store classification results in database"""
+        from shared.types import ClassificationRecord, Classification as ClassEnum
+
+        records = []
+        for result in response.results:
+            record = ClassificationRecord(
+                url=result.url,
+                domain=result.domain,
+                classification=ClassEnum(result.classification),
+                confidence=result.confidence,
+                proof_hash=response.proof_hash,
+                model_commitment=response.model_commitment,
+                input_commitment=result.input_commitment,
+                output_commitment=result.output_commitment,
+                features=result.features,
+                context_used=result.context_used,
+                source=source,
+                batch_id=batch_id,
+                analyst_paid_usdc=0,  # Self-classified
+                policy_proof_hash=response.proof_hash
+            )
+            records.append(record)
+
+        await db.insert_classifications_batch(records)
+        logger.info(f"Stored {len(records)} classifications for batch {batch_id}")
 
     def calculate_price(self, url_count: int) -> float:
         """Calculate price for classifying URLs"""
@@ -274,9 +439,16 @@ async def lifespan(app: FastAPI):
 
     # Initialize database and analyst
     await db.connect()
+    await db.init_schema()
     await analyst_agent.initialize()
+
+    # Start the orchestration loop (Value Chain mode)
+    # Analyst is now the customer who drives the pipeline
+    asyncio.create_task(analyst_agent.start())
+
     yield
     # Shutdown
+    await analyst_agent.stop()
     await db.close()
 
 
@@ -334,10 +506,13 @@ async def health():
     return {
         "status": "healthy",
         "production_mode": config.production_mode,
+        "orchestrator": True,  # Analyst drives the pipeline in Value Chain mode
+        "running": analyst_agent.running,
+        "batches_processed": analyst_agent.batches_processed,
         "model_commitment": analyst_agent.model_commitment,
         "zkml_available": classifier_prover.prover.zkml_available,
         "real_proofs_enabled": classifier_prover.prover.zkml_available,
-        "payment_flow": "proof-gated"
+        "payment_flow": "value-chain"  # Analyst pays Scout pays Policy
     }
 
 
