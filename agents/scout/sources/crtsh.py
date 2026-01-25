@@ -5,6 +5,7 @@ Monitors crt.sh for newly issued certificates that may indicate phishing domains
 Looks for certificates issued to domains that impersonate known brands.
 """
 import asyncio
+import logging
 import re
 from datetime import datetime, timedelta
 from typing import List, Set, Optional
@@ -13,6 +14,8 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import URLSource
+
+logger = logging.getLogger("scout.crtsh")
 
 
 class CertTransparencySource(URLSource):
@@ -113,12 +116,15 @@ class CertTransparencySource(URLSource):
 
             self._last_query_time = datetime.utcnow()
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             self.record_error()
+            logger.warning(f"crt.sh fetch timeout: {e}")
         except httpx.HTTPError as e:
             self.record_error()
+            logger.warning(f"crt.sh HTTP error: {e}")
         except Exception as e:
             self.record_error()
+            logger.error(f"crt.sh fetch error: {e}", exc_info=True)
 
         return suspicious_urls
 

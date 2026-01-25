@@ -5,11 +5,14 @@ Fetches malware URLs from URLhaus (abuse.ch).
 https://urlhaus.abuse.ch/
 """
 import httpx
+import logging
 from typing import List
 import csv
 import io
 
 from .base import URLSource
+
+logger = logging.getLogger("scout.urlhaus")
 
 
 class URLhausSource(URLSource):
@@ -62,7 +65,15 @@ class URLhausSource(URLSource):
 
                 return urls
 
+        except httpx.TimeoutException as e:
+            self.record_error()
+            logger.warning(f"URLhaus fetch timeout: {e}")
+            return []
+        except httpx.HTTPError as e:
+            self.record_error()
+            logger.warning(f"URLhaus HTTP error: {e}")
+            return []
         except Exception as e:
             self.record_error()
-            print(f"URLhaus fetch error: {e}")
+            logger.error(f"URLhaus fetch error: {e}", exc_info=True)
             return []

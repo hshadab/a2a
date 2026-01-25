@@ -5,9 +5,12 @@ Fetches URLs from OpenPhish's free feed.
 https://openphish.com/
 """
 import httpx
+import logging
 from typing import List
 
 from .base import URLSource
+
+logger = logging.getLogger("scout.openphish")
 
 
 class OpenPhishSource(URLSource):
@@ -50,7 +53,15 @@ class OpenPhishSource(URLSource):
 
                 return new_urls[:limit]
 
+        except httpx.TimeoutException as e:
+            self.record_error()
+            logger.warning(f"OpenPhish fetch timeout: {e}")
+            return []
+        except httpx.HTTPError as e:
+            self.record_error()
+            logger.warning(f"OpenPhish HTTP error: {e}")
+            return []
         except Exception as e:
             self.record_error()
-            print(f"OpenPhish fetch error: {e}")
+            logger.error(f"OpenPhish fetch error: {e}", exc_info=True)
             return []

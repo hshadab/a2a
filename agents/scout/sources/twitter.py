@@ -4,6 +4,7 @@ Twitter/X Source
 Monitors security researcher accounts on Twitter/X for shared phishing URLs.
 Requires a Twitter API bearer token for access.
 """
+import logging
 import re
 from datetime import datetime, timedelta
 from typing import List, Set, Optional
@@ -12,6 +13,8 @@ from urllib.parse import urlparse
 import httpx
 
 from .base import URLSource
+
+logger = logging.getLogger("scout.twitter")
 
 
 class TwitterSource(URLSource):
@@ -109,12 +112,15 @@ class TwitterSource(URLSource):
                         if url not in suspicious_urls:
                             suspicious_urls.append(url)
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             self.record_error()
+            logger.warning(f"Twitter API timeout: {e}")
         except httpx.HTTPError as e:
             self.record_error()
+            logger.warning(f"Twitter API HTTP error: {e}")
         except Exception as e:
             self.record_error()
+            logger.error(f"Twitter API fetch error: {e}", exc_info=True)
 
         return suspicious_urls
 
