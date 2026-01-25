@@ -29,9 +29,12 @@ from shared.events import (
     broadcaster,
     emit_policy_proving, emit_policy_response
 )
-from shared.a2a import build_agent_card, build_skill
+from shared.a2a import build_agent_card, build_skill, build_agent_card_v3, build_skill_v3
 from shared.prover import authorization_prover, compute_commitment
 from shared.logging_config import policy_logger as logger
+from shared.jsonrpc import JSONRPCRouter, create_jsonrpc_endpoint, TaskNotFoundError
+from shared.task import TaskStore, Task, TaskState, execute_task
+from shared.sse import create_sse_response
 
 
 # ============ Request/Response Models ============
@@ -193,50 +196,31 @@ app.add_middleware(
 
 @app.get("/.well-known/agent.json")
 async def agent_card():
-    """A2A Agent Card"""
-    return build_agent_card(
+    """A2A v0.3 Agent Card"""
+    return build_agent_card_v3(
         name="Policy Agent",
         description="Authorizes spending on URL classification with zkML proofs",
         url=config.policy_url,
+        version="1.0.0",
+        streaming=False,
+        push_notifications=False,
+        state_transition_history=True,
+        provider="ThreatProof Network",
+        documentation_url=f"{config.policy_url}/docs",
+        default_payment_address=config.treasury_address,
+        supported_payment_methods=["x402"],
         skills=[
-            build_skill(
+            build_skill_v3(
                 skill_id="authorize-batch",
                 name="Batch Authorization",
-                description="Authorize spending for URL classification batch",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "batch_id": {"type": "string"},
-                        "url_count": {"type": "integer"},
-                        "estimated_cost_usdc": {"type": "number"},
-                        "budget_remaining_usdc": {"type": "number"},
-                        "source_reputation": {"type": "number"},
-                        "novelty_score": {"type": "number"},
-                        "time_since_last_batch_seconds": {"type": "integer"},
-                        "threat_level": {"type": "number"}
-                    },
-                    "required": [
-                        "batch_id", "url_count", "estimated_cost_usdc",
-                        "budget_remaining_usdc"
-                    ]
-                },
-                output_schema={
-                    "type": "object",
-                    "properties": {
-                        "batch_id": {"type": "string"},
-                        "decision": {"type": "string", "enum": ["AUTHORIZED", "DENIED"]},
-                        "confidence": {"type": "number"},
-                        "proof": {"type": "string"},
-                        "proof_hash": {"type": "string"},
-                        "model_commitment": {"type": "string"},
-                        "input_commitment": {"type": "string"},
-                        "output_commitment": {"type": "string"},
-                        "prove_time_ms": {"type": "integer"}
-                    }
-                },
+                description="Authorize spending for URL classification batch with zkML proof of correct policy evaluation",
+                tags=["authorization", "policy", "zkml", "budget"],
+                input_modes=["application/json"],
+                output_modes=["application/json"],
                 price_amount=config.policy_price_per_decision,
                 price_currency="USDC",
                 price_per="decision",
+                chain=config.base_chain_caip2,  # CAIP-2 format
                 proof_required=True,
                 model_commitment=policy_agent.model_commitment
             )
@@ -341,6 +325,121 @@ async def authorize_batch(request: AuthorizeRequest) -> AuthorizeResponse:
 async def authorize(request: AuthorizeRequest) -> AuthorizeResponse:
     """Alias for authorize-batch"""
     return await policy_agent.authorize(request)
+
+
+# ============ JSON-RPC 2.0 Endpoint (A2A v0.3) ============
+
+# Task store for tracking A2A tasks
+policy_task_store = TaskStore()
+
+# JSON-RPC router
+jsonrpc_router = JSONRPCRouter()
+
+
+@jsonrpc_router.method("task/send")
+async def task_send(params: dict) -> dict:
+    """
+    A2A task/send method.
+
+    Creates a task, executes the authorize-batch skill, and returns the result.
+    """
+    skill_id = params.get("skillId", "authorize-batch")
+    input_data = params.get("input", {})
+    context_id = params.get("contextId")
+
+    if skill_id != "authorize-batch":
+        raise ValueError(f"Unknown skill: {skill_id}")
+
+    # Create task
+    task = await policy_task_store.create(
+        skill_id=skill_id,
+        input_data=input_data,
+        context_id=context_id,
+        payment_required=True,
+        payment_amount=str(config.policy_price_per_decision),
+        payment_currency="USDC",
+        payment_chain=config.base_chain_caip2
+    )
+
+    # Execute the authorization
+    async def authorization_handler(inp: dict) -> dict:
+        request = AuthorizeRequest(**inp)
+        response = await policy_agent.authorize(request)
+        return response.model_dump()
+
+    task = await execute_task(task, policy_task_store, authorization_handler)
+
+    # Add proof as artifact
+    if task.output and task.output.get("proof"):
+        task.add_artifact(
+            name="authorization_proof",
+            data={
+                "proof_hash": task.output.get("proof_hash"),
+                "model_commitment": task.output.get("model_commitment"),
+                "input_commitment": task.output.get("input_commitment"),
+                "output_commitment": task.output.get("output_commitment")
+            },
+            mime_type="application/json"
+        )
+        await policy_task_store.update(task)
+
+    return task.to_response()
+
+
+@jsonrpc_router.method("task/get")
+async def task_get(params: dict) -> dict:
+    """
+    A2A task/get method.
+
+    Returns the current state of a task by ID.
+    """
+    task_id = params.get("taskId")
+    if not task_id:
+        raise ValueError("taskId is required")
+
+    task = await policy_task_store.get(task_id)
+    if not task:
+        raise TaskNotFoundError(task_id)
+
+    return task.to_response()
+
+
+@jsonrpc_router.method("tasks/list")
+async def tasks_list(params: dict) -> dict:
+    """
+    List recent tasks.
+    """
+    limit = params.get("limit", 100)
+    tasks = await policy_task_store.get_recent(limit=limit)
+    return {
+        "tasks": [t.to_response() for t in tasks],
+        "total": policy_task_store.count()
+    }
+
+
+# Register the JSON-RPC endpoint
+app.post("/a2a")(jsonrpc_router.create_endpoint())
+
+
+# ============ SSE Streaming Endpoint ============
+
+@app.get("/tasks/{task_id}/stream")
+async def stream_task(task_id: str):
+    """
+    Stream task progress via Server-Sent Events.
+
+    Returns SSE events for:
+    - task/status: State changes
+    - task/artifact: New artifacts
+    - task/complete: Task completion
+    - task/error: Task failure
+    """
+    task = await policy_task_store.get(task_id)
+    if not task:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+
+    return create_sse_response(task_id, policy_task_store)
 
 
 if __name__ == "__main__":

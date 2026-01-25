@@ -34,7 +34,8 @@ from shared.events import (
 from shared.a2a import (
     A2AClient, PaymentRequiredError,
     invoke_policy_authorization, invoke_analyst_classification,
-    build_agent_card, build_skill
+    build_agent_card, build_skill,
+    build_agent_card_v3, build_skill_v3
 )
 from shared.x402 import X402Client
 from shared.logging_config import scout_logger as logger
@@ -549,26 +550,26 @@ app.add_middleware(
 
 @app.get("/.well-known/agent.json")
 async def agent_card():
-    """A2A Agent Card"""
-    return build_agent_card(
+    """A2A v0.3 Agent Card"""
+    return build_agent_card_v3(
         name="Scout Agent",
         description="Discovers suspicious URLs and orchestrates threat intelligence gathering",
         url=config.scout_url,
+        version="1.0.0",
+        streaming=False,
+        push_notifications=False,
+        state_transition_history=True,
+        provider="ThreatProof Network",
+        documentation_url=f"{config.scout_url}/docs",
         skills=[
-            build_skill(
+            build_skill_v3(
                 skill_id="discover-urls",
                 name="URL Discovery",
-                description="Discover suspicious URLs from multiple sources",
-                input_schema={"type": "object", "properties": {}},
-                output_schema={
-                    "type": "object",
-                    "properties": {
-                        "batch_id": {"type": "string"},
-                        "url_count": {"type": "integer"},
-                        "source": {"type": "string"}
-                    }
-                },
-                price_amount=0,  # Scout is the initiator
+                description="Discover suspicious URLs from multiple sources including Certificate Transparency, typosquatting detection, and threat feeds",
+                tags=["threat-intel", "url-discovery", "phishing", "security"],
+                input_modes=["application/json"],
+                output_modes=["application/json"],
+                price_amount=0,  # Scout is the initiator, no payment required
                 proof_required=False
             )
         ]

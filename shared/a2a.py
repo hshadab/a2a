@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 import json
 
-from .types import AgentCard, SkillDefinition
+from .types import AgentCard, SkillDefinition, AgentCardV3, AgentSkillV3, AgentCapabilitiesV3
 from .config import config
 
 
@@ -157,7 +157,7 @@ def build_agent_card(
     skills: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
-    Build an A2A agent card.
+    Build an A2A agent card (legacy v1.0).
 
     Returns a dict suitable for JSON serialization.
     """
@@ -169,6 +169,53 @@ def build_agent_card(
         "capabilities": {
             "skills": skills
         }
+    }
+
+
+def build_agent_card_v3(
+    name: str,
+    description: str,
+    url: str,
+    skills: List[Dict[str, Any]],
+    version: str = "1.0.0",
+    streaming: bool = False,
+    push_notifications: bool = False,
+    state_transition_history: bool = True,
+    provider: str = "ThreatProof Network",
+    documentation_url: Optional[str] = None,
+    default_payment_address: Optional[str] = None,
+    supported_payment_methods: List[str] = None
+) -> Dict[str, Any]:
+    """
+    Build an A2A v0.3 compliant agent card.
+
+    Returns a dict suitable for JSON serialization with:
+    - protocolVersion: "0.3"
+    - capabilities object with streaming flags
+    - skills with inputModes, outputModes, and x402 pricing
+    """
+    if supported_payment_methods is None:
+        supported_payment_methods = ["x402"]
+
+    return {
+        "name": name,
+        "description": description,
+        "url": url,
+        "version": version,
+        "protocolVersion": "0.3",
+        "capabilities": {
+            "streaming": streaming,
+            "pushNotifications": push_notifications,
+            "stateTransitionHistory": state_transition_history
+        },
+        "authentication": {
+            "schemes": ["none"]
+        },
+        "skills": skills,
+        "provider": provider,
+        "documentationUrl": documentation_url,
+        "defaultPaymentAddress": default_payment_address,
+        "supportedPaymentMethods": supported_payment_methods
     }
 
 
@@ -184,7 +231,7 @@ def build_skill(
     proof_required: bool = False,
     model_commitment: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Build a skill definition for an agent card"""
+    """Build a skill definition for an agent card (legacy format)"""
     skill = {
         "id": skill_id,
         "name": name,
@@ -203,6 +250,64 @@ def build_skill(
             "proof_required": True,
             "proof_type": "zkml",
             "model_commitment": model_commitment
+        }
+
+    return skill
+
+
+def build_skill_v3(
+    skill_id: str,
+    name: str,
+    description: str,
+    tags: List[str] = None,
+    input_modes: List[str] = None,
+    output_modes: List[str] = None,
+    price_amount: float = 0,
+    price_currency: str = "USDC",
+    price_per: str = "call",
+    chain: str = "eip155:8453",
+    proof_required: bool = False,
+    model_commitment: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Build an A2A v0.3 skill definition.
+
+    Features:
+    - inputModes/outputModes for content negotiation
+    - CAIP-2 chain identifier in price
+    - Tags for skill discovery
+    """
+    if tags is None:
+        tags = []
+    if input_modes is None:
+        input_modes = ["application/json"]
+    if output_modes is None:
+        output_modes = ["application/json"]
+
+    skill = {
+        "id": skill_id,
+        "name": name,
+        "description": description,
+        "tags": tags,
+        "inputModes": input_modes,
+        "outputModes": output_modes,
+    }
+
+    # x402 price extension with CAIP-2 chain
+    if price_amount > 0:
+        skill["price"] = {
+            "amount": str(price_amount),
+            "currency": price_currency,
+            "per": price_per,
+            "chain": chain  # CAIP-2 format
+        }
+
+    # zkML proof extension
+    if proof_required:
+        skill["proofPolicy"] = {
+            "required": True,
+            "type": "zkml",
+            "modelCommitment": model_commitment
         }
 
     return skill

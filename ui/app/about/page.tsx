@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, Shield, Zap, DollarSign, Lock, Check, ArrowRight, Github } from 'lucide-react';
+import { ExternalLink, Shield, Zap, DollarSign, Lock, Check, ArrowRight, Github, Search, Scale, Microscope, Bot, X } from 'lucide-react';
 
 export default function AboutPage() {
   return (
@@ -31,23 +31,23 @@ export default function AboutPage() {
 
         <div className="grid grid-cols-3 gap-6 mb-8">
           <AgentBox
-            emoji="🔭"
+            icon={<Search size={24} />}
             name="Threat Scout"
             role="URL Discovery"
             color="#3b82f6"
             description="Proactively discovers threats via typosquatting detection, Certificate Transparency monitoring, and threat feed aggregation."
           />
           <AgentBox
-            emoji="⚖️"
+            icon={<Scale size={24} />}
             name="Spending Policy"
-            role="Budget Authorization"
+            role="Proof of Authorization"
             color="#a855f7"
             description="Authorizes spending on URL classification. Generates zkML proofs that the budget decision followed the policy rules."
           />
           <AgentBox
-            emoji="🔬"
+            icon={<Microscope size={24} />}
             name="URL Classifier"
-            role="Threat Analysis"
+            role="Proof of Analysis"
             color="#22d3ee"
             description="Classifies URLs as phishing/safe using ML. Generates zkML proofs that the classification was computed correctly."
           />
@@ -77,8 +77,8 @@ export default function AboutPage() {
 
         {/* Google A2A Protocol */}
         <TechSection
-          icon={<div className="text-3xl">🤖</div>}
-          title="Google A2A Protocol"
+          icon={<Bot className="text-blue-400" size={32} />}
+          title="Google A2A Protocol v0.3"
           subtitle="Agent-to-Agent Communication"
           color="#4285f4"
           links={[
@@ -88,27 +88,54 @@ export default function AboutPage() {
         >
           <p className="text-gray-300 mb-4">
             A2A (Agent-to-Agent) is Google's open protocol for AI agents to discover, communicate,
-            and collaborate with each other. It provides a standardized way for autonomous agents
-            to negotiate tasks and exchange capabilities.
+            and collaborate with each other. ThreatProof implements <strong className="text-blue-400">A2A v0.3</strong> with
+            JSON-RPC 2.0 transport, task lifecycle management, and SSE streaming.
           </p>
 
-          <h4 className="text-white font-semibold mb-2">How ThreatProof Uses A2A:</h4>
+          <h4 className="text-white font-semibold mb-2">A2A v0.3 Features:</h4>
           <ul className="space-y-2 text-gray-400">
-            <FeatureItem text="Agent Cards: Each agent publishes a /.well-known/agent.json describing its capabilities and pricing" />
-            <FeatureItem text="Skill Discovery: Scout discovers Policy and Analyst agents' skills dynamically" />
-            <FeatureItem text="Task Negotiation: Agents negotiate batch sizes, costs, and proof requirements" />
-            <FeatureItem text="Interoperability: Any A2A-compatible agent could join the network" />
+            <FeatureItem text="Agent Cards v0.3: Protocol version, capabilities, and skill tags for discovery" />
+            <FeatureItem text="JSON-RPC 2.0: Standard transport with task/send and task/get methods" />
+            <FeatureItem text="Task Lifecycle: State machine (submitted → working → completed/failed)" />
+            <FeatureItem text="SSE Streaming: Real-time task progress via Server-Sent Events" />
+            <FeatureItem text="CAIP-2 Chains: Standard chain identifiers (eip155:8453 for Base)" />
           </ul>
 
-          <CodeBlock title="Agent Card Example" code={`// GET /.well-known/agent.json
+          <CodeBlock title="A2A v0.3 Agent Card" code={`// GET /.well-known/agent.json
 {
-  "name": "Policy Agent",
-  "description": "Authorizes threat intel spending",
+  "name": "Analyst Agent",
+  "protocolVersion": "0.3",
+  "capabilities": {
+    "streaming": false,
+    "stateTransitionHistory": true
+  },
   "skills": [{
-    "id": "authorize-batch",
-    "price": { "amount": "0.001", "currency": "USDC" },
-    "proof_required": true
+    "id": "classify-urls",
+    "tags": ["classification", "phishing", "zkml"],
+    "inputModes": ["application/json"],
+    "outputModes": ["application/json"],
+    "price": {
+      "amount": "0.0005",
+      "currency": "USDC",
+      "chain": "eip155:8453"
+    }
   }]
+}`} />
+
+          <CodeBlock title="JSON-RPC 2.0 Request" code={`// POST /a2a
+{
+  "jsonrpc": "2.0",
+  "method": "task/send",
+  "params": {
+    "skillId": "classify-urls",
+    "input": {
+      "batch_id": "abc123",
+      "urls": ["https://example.com"],
+      "policy_proof_hash": "0x..."
+    },
+    "paymentReceipt": "0x..."
+  },
+  "id": "req-1"
 }`} />
         </TechSection>
 
@@ -116,7 +143,7 @@ export default function AboutPage() {
         <TechSection
           icon={<DollarSign className="text-green-400" size={32} />}
           title="x402 Payment Protocol"
-          subtitle="HTTP 402 Payment Required"
+          subtitle="HTTP 402 + Coinbase Facilitator"
           color="#22c55e"
           links={[
             { label: 'x402 Specification', url: 'https://www.x402.org/' },
@@ -129,31 +156,63 @@ export default function AboutPage() {
             perfect for autonomous agent economies.
           </p>
 
+          {/* Coinbase Facilitator Box */}
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4">
+            <h5 className="text-green-400 font-medium mb-2 flex items-center gap-2">
+              <Zap size={16} />
+              Coinbase x402 Facilitator
+            </h5>
+            <ul className="text-sm text-gray-400 space-y-1">
+              <FeatureItem text="Fee-free payments for payers — facilitator covers gas" />
+              <FeatureItem text="CAIP-2 chain identifiers (eip155:8453 for Base)" />
+              <FeatureItem text="Payment intent API for seamless UX" />
+              <FeatureItem text="Automatic receipt verification" />
+            </ul>
+          </div>
+
           <h4 className="text-white font-semibold mb-2">How ThreatProof Uses x402:</h4>
           <ul className="space-y-2 text-gray-400">
             <FeatureItem text="Pay-per-Request: Scout pays 0.001 USDC per authorization, 0.0005 USDC per URL classification" />
             <FeatureItem text="USDC on Base: Fast, cheap transactions (~$0.001 gas) on Coinbase's L2" />
-            <FeatureItem text="Self-Sustaining: All agents share the same treasury, so USDC circulates internally" />
-            <FeatureItem text="Transparent Pricing: Costs declared upfront in agent cards" />
+            <FeatureItem text="CAIP-2 Chains: Standard chain identifiers in payment challenges" />
+            <FeatureItem text="Transparent Pricing: Costs declared upfront in agent cards with chain info" />
           </ul>
 
-          <CodeBlock title="x402 Flow" code={`// 1. Scout requests classification
-POST /classify { urls: [...] }
+          <CodeBlock title="x402 Payment Challenge (CAIP-2)" code={`// HTTP 402 Response
+{
+  "version": "1",
+  "amount": "0.025",
+  "currency": "USDC",
+  "recipient": "0x6c67...",
+  "chain": "eip155:8453",  // CAIP-2 format
+  "chain_id": 8453,
+  "token_address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  "expires": 1706234567,
+  "nonce": "abc123..."
+}`} />
 
-// 2. Analyst responds with 402
-HTTP 402 Payment Required
-X-Payment-Address: 0x6c67...
-X-Payment-Amount: 0.025 USDC
+          <CodeBlock title="JSON-RPC with Payment" code={`// POST /a2a (with payment)
+{
+  "jsonrpc": "2.0",
+  "method": "task/send",
+  "params": {
+    "skillId": "classify-urls",
+    "input": { "urls": [...] },
+    "paymentReceipt": "0xabc123..."
+  },
+  "id": "1"
+}
 
-// 3. Scout makes payment on Base
-await usdc.transfer(analyst, 0.025)
-
-// 4. Scout retries with receipt
-POST /classify
-X-Payment-Receipt: 0xabc123...
-
-// 5. Analyst provides service
-HTTP 200 { classifications: [...], proof: "..." }`} />
+// Response
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "id": "task-456",
+    "state": "completed",
+    "output": { "results": [...] }
+  },
+  "id": "1"
+}`} />
         </TechSection>
 
         {/* Jolt Atlas zkML */}
@@ -178,19 +237,19 @@ HTTP 200 { classifications: [...], proof: "..." }`} />
             <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
               <h5 className="text-red-400 font-medium mb-2">Without Proofs</h5>
               <ul className="text-sm text-gray-400 space-y-1">
-                <li>❌ Policy could approve everything</li>
-                <li>❌ Analyst could return random results</li>
-                <li>❌ No way to verify work was done</li>
-                <li>❌ Must trust agents blindly</li>
+                <li className="flex items-center gap-2"><X size={12} className="text-red-400" /> Policy could approve everything</li>
+                <li className="flex items-center gap-2"><X size={12} className="text-red-400" /> Analyst could return random results</li>
+                <li className="flex items-center gap-2"><X size={12} className="text-red-400" /> No way to verify work was done</li>
+                <li className="flex items-center gap-2"><X size={12} className="text-red-400" /> Must trust agents blindly</li>
               </ul>
             </div>
             <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
               <h5 className="text-green-400 font-medium mb-2">With zkML Proofs</h5>
               <ul className="text-sm text-gray-400 space-y-1">
-                <li>✓ Every decision is verifiable</li>
-                <li>✓ Model commitment binds exact weights</li>
-                <li>✓ Input/output commitments prove data</li>
-                <li>✓ Trustless agent collaboration</li>
+                <li className="flex items-center gap-2"><Check size={12} className="text-green-400" /> Every decision is verifiable</li>
+                <li className="flex items-center gap-2"><Check size={12} className="text-green-400" /> Model commitment binds exact weights</li>
+                <li className="flex items-center gap-2"><Check size={12} className="text-green-400" /> Input/output commitments prove data</li>
+                <li className="flex items-center gap-2"><Check size={12} className="text-green-400" /> Trustless agent collaboration</li>
               </ul>
             </div>
           </div>
@@ -339,8 +398,8 @@ let proof = jolt_atlas::prove(
 
 // Helper Components
 
-function AgentBox({ emoji, name, role, color, description }: {
-  emoji: string;
+function AgentBox({ icon, name, role, color, description }: {
+  icon: React.ReactNode;
   name: string;
   role: string;
   color: string;
@@ -353,10 +412,10 @@ function AgentBox({ emoji, name, role, color, description }: {
     >
       <div className="flex items-center gap-3 mb-3">
         <div
-          className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
-          style={{ backgroundColor: `${color}20`, border: `2px solid ${color}` }}
+          className="w-12 h-12 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: `${color}20`, border: `2px solid ${color}`, color }}
         >
-          {emoji}
+          {icon}
         </div>
         <div>
           <h3 className="font-bold" style={{ color }}>{name}</h3>

@@ -139,6 +139,7 @@ class X402PaymentChallenge(BaseModel):
     currency: str = "USDC"
     recipient: str
     chain_id: int = 8453
+    chain: str = "eip155:8453"  # CAIP-2 format for interoperability
     token_address: str
     expires: int
     nonce: str
@@ -162,6 +163,44 @@ class AgentCard(BaseModel):
     description: str
     url: str
     capabilities: Dict[str, Any]
+
+
+# ============ A2A v0.3 Types ============
+
+class AgentCapabilitiesV3(BaseModel):
+    """A2A v0.3 capabilities object"""
+    streaming: bool = False
+    pushNotifications: bool = False
+    stateTransitionHistory: bool = True
+
+
+class AgentSkillV3(BaseModel):
+    """A2A v0.3 skill definition"""
+    id: str
+    name: str
+    description: str
+    tags: List[str] = []
+    inputModes: List[str] = ["application/json"]
+    outputModes: List[str] = ["application/json"]
+    # x402 extension for pricing
+    price: Optional[Dict[str, Any]] = None
+
+
+class AgentCardV3(BaseModel):
+    """A2A v0.3 compliant agent card"""
+    name: str
+    description: str
+    url: str
+    version: str = "1.0.0"
+    protocolVersion: str = "0.3"
+    capabilities: AgentCapabilitiesV3 = Field(default_factory=AgentCapabilitiesV3)
+    authentication: Dict[str, Any] = Field(default_factory=lambda: {"schemes": ["none"]})
+    skills: List[AgentSkillV3] = []
+    provider: str = "ThreatProof Network"
+    documentationUrl: Optional[str] = None
+    # x402 extensions
+    defaultPaymentAddress: Optional[str] = None
+    supportedPaymentMethods: List[str] = ["x402"]
 
 
 # ============ Event Types (for WebSocket) ============

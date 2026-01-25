@@ -19,6 +19,10 @@ python-dotenv>=1.0.0
 onnxruntime>=1.16.0
 numpy>=1.24.0
 
+# A2A Protocol (Google Agent-to-Agent)
+# Note: a2a-sdk is optional, we implement A2A v0.3 natively
+# a2a-sdk>=0.3.22
+
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0

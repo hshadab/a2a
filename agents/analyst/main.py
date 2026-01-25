@@ -28,10 +28,13 @@ from shared.events import (
     broadcaster,
     emit_analyst_processing, emit_analyst_proving, emit_analyst_response
 )
-from shared.a2a import build_agent_card, build_skill
+from shared.a2a import build_agent_card, build_skill, build_agent_card_v3, build_skill_v3
 from shared.x402 import PaymentRequired, require_payment, get_payment_from_header, X402Client
 from shared.prover import classifier_prover, compute_commitment
 from shared.logging_config import analyst_logger as logger
+from shared.jsonrpc import JSONRPCRouter, create_jsonrpc_endpoint, TaskNotFoundError, PaymentRequiredError as JSONRPCPaymentRequired
+from shared.task import TaskStore, Task, TaskState, execute_task
+from shared.sse import create_sse_response
 
 from features import extract_features, URLFeatures
 
@@ -254,38 +257,31 @@ app.add_middleware(
 
 @app.get("/.well-known/agent.json")
 async def agent_card():
-    """A2A Agent Card"""
-    return build_agent_card(
+    """A2A v0.3 Agent Card"""
+    return build_agent_card_v3(
         name="Analyst Agent",
         description="Classifies URLs as phishing/safe/suspicious with zkML proofs",
         url=config.analyst_url,
+        version="1.0.0",
+        streaming=False,
+        push_notifications=False,
+        state_transition_history=True,
+        provider="ThreatProof Network",
+        documentation_url=f"{config.analyst_url}/docs",
+        default_payment_address=analyst_agent.wallet_address,
+        supported_payment_methods=["x402"],
         skills=[
-            build_skill(
+            build_skill_v3(
                 skill_id="classify-urls",
                 name="URL Classification",
-                description="Classify URLs with cryptographic proof of computation",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "batch_id": {"type": "string"},
-                        "urls": {"type": "array", "items": {"type": "string"}},
-                        "policy_proof_hash": {"type": "string"}
-                    },
-                    "required": ["batch_id", "urls", "policy_proof_hash"]
-                },
-                output_schema={
-                    "type": "object",
-                    "properties": {
-                        "batch_id": {"type": "string"},
-                        "results": {"type": "array"},
-                        "proof": {"type": "string"},
-                        "proof_hash": {"type": "string"},
-                        "model_commitment": {"type": "string"}
-                    }
-                },
+                description="Classify URLs as phishing/safe/suspicious with cryptographic proof of ML inference",
+                tags=["classification", "phishing", "zkml", "threat-intel", "security"],
+                input_modes=["application/json"],
+                output_modes=["application/json"],
                 price_amount=config.analyst_price_per_url,
                 price_currency="USDC",
                 price_per="url",
+                chain=config.base_chain_caip2,  # CAIP-2 format
                 proof_required=True,
                 model_commitment=analyst_agent.model_commitment
             )
@@ -424,6 +420,156 @@ async def extract_features_endpoint(url: str) -> Dict[str, Any]:
     """
     features = extract_features(url)
     return features.to_dict()
+
+
+# ============ JSON-RPC 2.0 Endpoint (A2A v0.3) ============
+
+# Task store for tracking A2A tasks
+analyst_task_store = TaskStore()
+
+# JSON-RPC router
+jsonrpc_router = JSONRPCRouter()
+
+
+@jsonrpc_router.method("task/send")
+async def task_send(params: dict) -> dict:
+    """
+    A2A task/send method.
+
+    Creates a task, executes the classify-urls skill, and returns the result.
+    Requires x402 payment via paymentReceipt in params.
+    """
+    skill_id = params.get("skillId", "classify-urls")
+    input_data = params.get("input", {})
+    context_id = params.get("contextId")
+    payment_receipt = params.get("paymentReceipt")
+
+    if skill_id != "classify-urls":
+        raise ValueError(f"Unknown skill: {skill_id}")
+
+    # Calculate required payment
+    urls = input_data.get("urls", [])
+    required_amount = analyst_agent.calculate_price(len(urls))
+
+    # Check for payment
+    if not payment_receipt:
+        raise JSONRPCPaymentRequired({
+            "amount": str(required_amount),
+            "currency": "USDC",
+            "recipient": analyst_agent.wallet_address,
+            "chain": config.base_chain_caip2,
+            "memo": f"classify-{input_data.get('batch_id', 'batch')}"
+        })
+
+    # Create task
+    task = await analyst_task_store.create(
+        skill_id=skill_id,
+        input_data=input_data,
+        context_id=context_id,
+        payment_required=True,
+        payment_amount=str(required_amount),
+        payment_currency="USDC",
+        payment_chain=config.base_chain_caip2
+    )
+
+    # Record payment
+    task.paymentReceipt = payment_receipt
+    task.paymentVerified = True  # Simplified verification for demo
+    await analyst_task_store.update(task)
+
+    # Execute the classification
+    async def classification_handler(inp: dict) -> dict:
+        request = ClassifyRequest(**inp)
+        response = await analyst_agent.classify_batch(
+            batch_id=request.batch_id,
+            urls=request.urls,
+            policy_proof_hash=request.policy_proof_hash
+        )
+        return response.model_dump()
+
+    task = await execute_task(task, analyst_task_store, classification_handler)
+
+    # Add proof as artifact
+    if task.output and task.output.get("proof"):
+        task.add_artifact(
+            name="classification_proof",
+            data={
+                "proof_hash": task.output.get("proof_hash"),
+                "model_commitment": task.output.get("model_commitment"),
+                "input_commitment": task.output.get("input_commitment"),
+                "output_commitment": task.output.get("output_commitment")
+            },
+            mime_type="application/json"
+        )
+
+        # Add individual classification results as artifact
+        task.add_artifact(
+            name="classification_results",
+            data=task.output.get("results", []),
+            mime_type="application/json"
+        )
+        await analyst_task_store.update(task)
+
+    # Update earnings
+    analyst_agent.total_earned_usdc += required_amount
+
+    return task.to_response()
+
+
+@jsonrpc_router.method("task/get")
+async def task_get(params: dict) -> dict:
+    """
+    A2A task/get method.
+
+    Returns the current state of a task by ID.
+    """
+    task_id = params.get("taskId")
+    if not task_id:
+        raise ValueError("taskId is required")
+
+    task = await analyst_task_store.get(task_id)
+    if not task:
+        raise TaskNotFoundError(task_id)
+
+    return task.to_response()
+
+
+@jsonrpc_router.method("tasks/list")
+async def tasks_list(params: dict) -> dict:
+    """
+    List recent tasks.
+    """
+    limit = params.get("limit", 100)
+    tasks = await analyst_task_store.get_recent(limit=limit)
+    return {
+        "tasks": [t.to_response() for t in tasks],
+        "total": analyst_task_store.count()
+    }
+
+
+# Register the JSON-RPC endpoint
+app.post("/a2a")(jsonrpc_router.create_endpoint())
+
+
+# ============ SSE Streaming Endpoint ============
+
+@app.get("/tasks/{task_id}/stream")
+async def stream_task(task_id: str):
+    """
+    Stream task progress via Server-Sent Events.
+
+    Returns SSE events for:
+    - task/status: State changes
+    - task/artifact: New artifacts (proofs, classifications)
+    - task/complete: Task completion
+    - task/error: Task failure
+    """
+    task = await analyst_task_store.get(task_id)
+    if not task:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+
+    return create_sse_response(task_id, analyst_task_store)
 
 
 if __name__ == "__main__":

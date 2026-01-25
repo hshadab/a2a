@@ -18,7 +18,12 @@ class Config:
     # Base mainnet x402 config
     base_rpc_url: str = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
     base_chain_id: int = 8453
+    base_chain_caip2: str = "eip155:8453"  # CAIP-2 format for chain identification
     usdc_address: str = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"  # USDC on Base
+
+    # Coinbase x402 Facilitator config
+    use_coinbase_facilitator: bool = os.getenv("USE_COINBASE_FACILITATOR", "false").lower() == "true"
+    coinbase_facilitator_url: str = os.getenv("COINBASE_FACILITATOR_URL", "https://x402.coinbase.com")
 
     # Wallet (for payments)
     private_key: Optional[str] = os.getenv("PRIVATE_KEY")
