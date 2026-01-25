@@ -128,10 +128,19 @@ class X402Client:
 
         Returns a PaymentReceipt with tx details.
         In demo mode (no account), returns a simulated receipt.
+        In production mode, raises an error if no account is configured.
         """
+        from .logging_config import get_logger
+        logger = get_logger("x402")
+
         if self.account is None:
+            if config.production_mode:
+                raise RuntimeError(
+                    "Production mode requires real payments but no wallet is configured. "
+                    "Set PRIVATE_KEY environment variable with a funded wallet's private key."
+                )
             # Demo mode - return simulated receipt
-            print(f"[x402] DEMO MODE: Simulating payment of ${amount_usdc} USDC to {recipient[:10]}...")
+            logger.warning(f"DEMO MODE: Simulating payment of ${amount_usdc} USDC to {recipient[:10]}...")
             return PaymentReceipt(
                 tx_hash="simulated",
                 amount_usdc=amount_usdc,
@@ -149,12 +158,22 @@ class X402Client:
         nonce = self.w3.eth.get_transaction_count(self.account.address)
         gas_price = self.w3.eth.gas_price
 
+        # Use configurable gas limit with estimation fallback
+        try:
+            estimated_gas = self.usdc_contract.functions.transfer(
+                recipient,
+                amount_raw
+            ).estimate_gas({'from': self.account.address})
+            gas_limit = int(estimated_gas * 1.2)  # Add 20% buffer
+        except Exception:
+            gas_limit = config.x402_gas_limit  # Use configured default
+
         tx = self.usdc_contract.functions.transfer(
             recipient,
             amount_raw
         ).build_transaction({
             'chainId': self.chain_id,
-            'gas': 100000,  # ERC20 transfer typically uses ~65k
+            'gas': gas_limit,
             'gasPrice': gas_price,
             'nonce': nonce,
         })

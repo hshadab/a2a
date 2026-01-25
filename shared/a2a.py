@@ -133,7 +133,7 @@ class A2AClient:
         except Exception:
             return False
 
-    def register_agent(self, agent_url: str, card: AgentCard):
+    def register_agent(self, agent_url: str, card: AgentCard) -> None:
         """Manually register an agent"""
         self.known_agents[agent_url] = card
         self._agent_cache[agent_url] = datetime.utcnow()

@@ -258,6 +258,11 @@ class Database:
     async def connect(self):
         """Initialize connection pool or fall back to in-memory mode"""
         if not ASYNCPG_AVAILABLE:
+            if config.production_mode:
+                raise RuntimeError(
+                    "Production mode requires PostgreSQL but asyncpg is not available. "
+                    "Install asyncpg: pip install asyncpg"
+                )
             logger.info("asyncpg not available, using in-memory storage")
             self._demo_mode = True
             self._in_memory = InMemoryDatabase()
@@ -265,11 +270,22 @@ class Database:
             return
 
         try:
-            # Handle SSL for Render PostgreSQL
+            # Configure SSL based on DATABASE_SSL_MODE
             import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            ssl_mode = config.database_ssl_mode.lower()
+
+            if ssl_mode == "disable":
+                ssl_context = False
+            elif ssl_mode == "require":
+                # Require SSL with full verification
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = True
+                ssl_context.verify_mode = ssl.CERT_REQUIRED
+            else:  # "prefer" (default)
+                # Prefer SSL but accept self-signed certs (for development/Render)
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
 
             self._pool = await asyncpg.create_pool(
                 self.database_url,
@@ -278,8 +294,13 @@ class Database:
                 timeout=30,
                 ssl=ssl_context
             )
-            logger.info("Connected to PostgreSQL")
+            logger.info(f"Connected to PostgreSQL (SSL mode: {ssl_mode})")
         except Exception as e:
+            if config.production_mode:
+                raise RuntimeError(
+                    f"Production mode requires PostgreSQL but connection failed: {e}. "
+                    f"Check DATABASE_URL configuration."
+                )
             logger.warning(f"PostgreSQL connection failed: {e}")
             logger.info("Falling back to in-memory storage (DEMO MODE)")
             self._demo_mode = True
