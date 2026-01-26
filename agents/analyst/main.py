@@ -712,6 +712,39 @@ async def stats():
     return analyst_agent.get_stats()
 
 
+@app.get("/debug/db")
+async def debug_db():
+    """Debug database connection"""
+    result = {
+        "demo_mode": db._demo_mode,
+        "pool_active": db._pool is not None,
+        "database_url_prefix": config.database_url[:60] + "..." if config.database_url else None,
+        "connection_error": getattr(db, '_connection_error', None),
+    }
+
+    # Check asyncpg
+    try:
+        import asyncpg
+        result["asyncpg_available"] = True
+        result["asyncpg_version"] = asyncpg.__version__
+    except ImportError as e:
+        result["asyncpg_available"] = False
+        result["asyncpg_error"] = str(e)
+
+    # Try to test connection
+    if db._pool:
+        try:
+            async with db._pool.acquire() as conn:
+                row = await conn.fetchrow("SELECT 1 as test")
+                result["connection_test"] = "success"
+        except Exception as e:
+            result["connection_test"] = f"error: {e}"
+    else:
+        result["connection_test"] = "no pool"
+
+    return result
+
+
 @app.post("/skills/classify-url")
 async def classify_url_endpoint(
     request: ClassifyRequest,

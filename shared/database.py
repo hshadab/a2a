@@ -299,6 +299,7 @@ class Database:
             )
             logger.info(f"Connected to PostgreSQL successfully")
         except Exception as e:
+            self._connection_error = str(e)
             logger.warning(f"PostgreSQL connection failed: {e}")
             if config.production_mode:
                 # Log warning but allow fallback for debugging
