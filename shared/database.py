@@ -295,29 +295,14 @@ class Database:
             try:
                 logger.info(f"Attempting PostgreSQL connection (attempt {attempt + 1}/{max_retries})...")
 
-                # Check if using Render internal connection (no SSL needed)
-                # Internal URLs don't have .render.com in them
-                use_ssl = '.render.com' in self.database_url or 'sslmode=require' in self.database_url
-
-                # Strip sslmode from URL since we handle SSL explicitly
-                db_url = self.database_url
-                if '?sslmode=' in db_url:
-                    db_url = db_url.split('?sslmode=')[0]
-
-                ssl_param = None
-                if use_ssl:
-                    import ssl as ssl_module
-                    ssl_ctx = ssl_module.create_default_context(ssl_module.Purpose.SERVER_AUTH)
-                    ssl_ctx.check_hostname = False
-                    ssl_ctx.verify_mode = ssl_module.CERT_NONE
-                    ssl_param = ssl_ctx
-
+                # Use the full URL with sslmode parameter - let asyncpg handle it
+                # Add connection timeout to prevent hanging
                 self._pool = await asyncpg.create_pool(
-                    db_url,
+                    self.database_url,
                     min_size=1,
-                    max_size=5,
-                    command_timeout=60,
-                    ssl=ssl_param,
+                    max_size=3,
+                    command_timeout=30,
+                    timeout=30,  # Connection timeout
                 )
 
                 # Test the connection
