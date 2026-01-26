@@ -467,14 +467,15 @@ function AgentCard({
 
   return (
     <div
-      className="w-full lg:flex-1 lg:max-w-md rounded-lg border bg-[#111111] transition-all duration-300"
+      className="w-full lg:flex-1 lg:max-w-md rounded-xl border transition-all duration-300"
       style={{
-        borderColor: isActive ? color : '#2a2a2a',
-        boxShadow: isProving ? `0 0 20px ${color}40` : 'none',
+        borderColor: isActive ? color : `${color}30`,
+        boxShadow: isProving ? `0 0 24px ${color}50` : `0 0 0 1px ${color}10`,
+        background: `linear-gradient(135deg, ${color}08 0%, #0f0f12 50%, #0a0a0f 100%)`,
       }}
     >
       {/* Header */}
-      <div className="p-3 md:p-4 border-b border-[#2a2a2a]" style={{ backgroundColor: `${color}08` }}>
+      <div className="p-3 md:p-4 border-b rounded-t-xl" style={{ borderColor: `${color}20`, backgroundColor: `${color}12` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
             <div
@@ -533,12 +534,12 @@ function AgentCard({
       </div>
 
       {/* What It Does */}
-      <div className="px-4 py-3 border-b border-[#2a2a2a]">
-        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1.5">What It Does</div>
+      <div className="px-4 py-3 border-b" style={{ borderColor: `${color}15`, backgroundColor: '#0d0d10' }}>
+        <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: `${color}90` }}>What It Does</div>
         <div className="space-y-1">
           {whatItDoes.map((item, i) => (
-            <div key={i} className="text-xs text-gray-300 flex items-start gap-2">
-              <span className="text-gray-500 mt-0.5">•</span>
+            <div key={i} className="text-xs text-gray-200 flex items-start gap-2">
+              <span style={{ color: `${color}70` }} className="mt-0.5">•</span>
               <span>{item}</span>
             </div>
           ))}
@@ -546,11 +547,11 @@ function AgentCard({
       </div>
 
       {/* What It Proves */}
-      <div className="px-4 py-3 border-b border-[#2a2a2a]" style={{ backgroundColor: `${color}05` }}>
-        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1.5">What It Proves</div>
+      <div className="px-4 py-3 border-b" style={{ borderColor: `${color}15`, backgroundColor: `${color}08` }}>
+        <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: `${color}90` }}>What It Proves</div>
         <div className="space-y-1">
           {whatItProves.map((item, i) => (
-            <div key={i} className="text-xs text-gray-300 flex items-start gap-2">
+            <div key={i} className="text-xs text-gray-200 flex items-start gap-2">
               <span style={{ color }} className="mt-0.5">✓</span>
               <span>{item}</span>
             </div>
@@ -560,9 +561,9 @@ function AgentCard({
 
       {/* Wallet Balance */}
       {walletBalance && (
-        <div className="px-4 py-2 border-b border-[#2a2a2a] bg-[#0a0a0a]">
+        <div className="px-4 py-2 border-b" style={{ borderColor: `${color}15`, backgroundColor: '#0c0c0f' }}>
           <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 text-gray-500">
+            <div className="flex items-center gap-1.5 text-gray-400">
               <Wallet size={12} />
               <span>Balance</span>
             </div>
@@ -575,37 +576,38 @@ function AgentCard({
       )}
 
       {/* Stats Row */}
-      <div className="px-4 py-3 border-b border-[#2a2a2a]">
+      <div className="px-4 py-3 border-b" style={{ borderColor: `${color}15`, backgroundColor: '#0d0d10' }}>
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-lg font-bold text-white font-mono">{stats.urlsProcessed.toLocaleString()}</div>
-            <div className="text-[10px] text-gray-500 uppercase">URLs</div>
+            <div className="text-[10px] text-gray-400 uppercase">URLs</div>
           </div>
           <div>
             <div className="text-lg font-bold text-green-400 font-mono">${stats.earned.toFixed(3)}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Earned</div>
+            <div className="text-[10px] text-gray-400 uppercase">Earned</div>
           </div>
           <div>
             <div className="text-lg font-bold text-red-400 font-mono">${stats.spent.toFixed(3)}</div>
-            <div className="text-[10px] text-gray-500 uppercase">Spent</div>
+            <div className="text-[10px] text-gray-400 uppercase">Spent</div>
           </div>
         </div>
       </div>
 
       {/* Models Section - Collapsible */}
-      <div className="border-b border-[#2a2a2a]">
+      <div className="border-b" style={{ borderColor: `${color}15` }}>
         <button
           onClick={() => toggleSection('models')}
-          className="w-full px-4 py-2 flex items-center justify-between text-xs text-gray-400 hover:bg-[#1a1a1a] transition-colors"
+          className="w-full px-4 py-2 flex items-center justify-between text-xs transition-colors"
+          style={{ color: `${color}90` }}
         >
           <span className="uppercase tracking-wide">ONNX Models</span>
           {expandedSections.models ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
         {expandedSections.models && (
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-3" style={{ backgroundColor: '#0c0c0f' }}>
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-gray-500">
+                <tr style={{ color: `${color}70` }}>
                   <th className="text-left py-1 font-normal">Model</th>
                   <th className="text-left py-1 font-normal">Size</th>
                   <th className="text-left py-1 font-normal">Shape</th>
@@ -624,8 +626,8 @@ function AgentCard({
             <div className="mt-2 space-y-1">
               {models.map((model) => (
                 <div key={`${model.name}-commit`} className="flex items-center gap-2 text-[10px]">
-                  <span className="text-gray-500 w-20">{model.name}:</span>
-                  <code className="text-gray-400 bg-[#1a1a1a] px-1.5 py-0.5 rounded flex-1 truncate">
+                  <span className="w-20" style={{ color: `${color}70` }}>{model.name}:</span>
+                  <code className="text-gray-400 px-1.5 py-0.5 rounded flex-1 truncate" style={{ backgroundColor: `${color}10` }}>
                     {model.commitment}
                   </code>
                   <button
@@ -642,23 +644,24 @@ function AgentCard({
       </div>
 
       {/* Proofs Section - Collapsible */}
-      <div className="border-b border-[#2a2a2a]">
+      <div className="border-b" style={{ borderColor: `${color}15` }}>
         <button
           onClick={() => toggleSection('proofs')}
-          className="w-full px-4 py-2 flex items-center justify-between text-xs text-gray-400 hover:bg-[#1a1a1a] transition-colors"
+          className="w-full px-4 py-2 flex items-center justify-between text-xs transition-colors"
+          style={{ color: `${color}90` }}
         >
           <div className="flex items-center gap-3">
             <span className="uppercase tracking-wide">Proofs</span>
-            <span className="text-gray-500 font-mono">{proofStats.generated} gen / {proofStats.verified} ver</span>
+            <span className="font-mono" style={{ color: `${color}60` }}>{proofStats.generated} gen / {proofStats.verified} ver</span>
           </div>
           {expandedSections.proofs ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
         {expandedSections.proofs && (
-          <div className="px-4 pb-3 space-y-3">
+          <div className="px-4 pb-3 space-y-3" style={{ backgroundColor: '#0c0c0f' }}>
             {/* Stats Table */}
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-gray-500">
+                <tr style={{ color: `${color}70` }}>
                   <th className="text-left py-1 font-normal">Metric</th>
                   <th className="text-right py-1 font-normal">Value</th>
                 </tr>
@@ -691,8 +694,8 @@ function AgentCard({
 
             {/* Last Proof */}
             {lastProof && (
-              <div className="border border-[#2a2a2a] rounded p-2 bg-[#0a0a0a]">
-                <div className="text-[10px] text-gray-500 uppercase mb-1">Last Proof</div>
+              <div className="rounded p-2" style={{ border: `1px solid ${color}25`, backgroundColor: `${color}08` }}>
+                <div className="text-[10px] uppercase mb-1" style={{ color: `${color}70` }}>Last Proof</div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-gray-500">Type: </span>
@@ -713,8 +716,8 @@ function AgentCard({
                 </div>
                 {lastProof.commitments.proof && (
                   <div className="mt-2 flex items-center gap-2 text-[10px]">
-                    <span className="text-gray-500">Hash:</span>
-                    <code className="text-gray-400 bg-[#1a1a1a] px-1.5 py-0.5 rounded flex-1 truncate">
+                    <span style={{ color: `${color}70` }}>Hash:</span>
+                    <code className="text-gray-400 px-1.5 py-0.5 rounded flex-1 truncate" style={{ backgroundColor: `${color}10` }}>
                       {lastProof.commitments.proof}
                     </code>
                     <button
@@ -732,15 +735,15 @@ function AgentCard({
       </div>
 
       {/* Activity Feed */}
-      <div className="p-4">
-        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Activity</div>
+      <div className="p-4" style={{ backgroundColor: '#0b0b0e' }}>
+        <div className="text-[10px] uppercase tracking-wide mb-2" style={{ color: `${color}80` }}>Activity</div>
         <div className="space-y-1.5 min-h-[60px]">
           {events.length === 0 ? (
             <div className="text-xs text-gray-500 flex items-center gap-2">
               <span className="flex gap-0.5">
-                <span className="w-1 h-1 rounded-full bg-gray-500 animate-pulse" />
-                <span className="w-1 h-1 rounded-full bg-gray-500 animate-pulse" style={{ animationDelay: '0.2s' }} />
-                <span className="w-1 h-1 rounded-full bg-gray-500 animate-pulse" style={{ animationDelay: '0.4s' }} />
+                <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: color }} />
+                <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: color, animationDelay: '0.2s' }} />
+                <span className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: color, animationDelay: '0.4s' }} />
               </span>
               Monitoring...
             </div>
@@ -750,7 +753,7 @@ function AgentCard({
                 key={`${event.timestamp}-${i}`}
                 className={`text-xs flex items-start gap-2 ${i === 0 ? 'text-white' : 'text-gray-500'}`}
               >
-                <span className="text-gray-600 text-[10px] mt-0.5 font-mono w-12">
+                <span className="text-[10px] mt-0.5 font-mono w-12" style={{ color: `${color}50` }}>
                   {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
                 <span className={i === 0 && isActive ? 'animate-pulse' : ''}>
