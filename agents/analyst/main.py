@@ -166,8 +166,22 @@ class AnalystAgent:
         """Get or create Redis connection"""
         if self._redis is None:
             try:
-                logger.info(f"Connecting to Redis at: {config.redis_url[:30]}...")
-                self._redis = await redis.from_url(config.redis_url, decode_responses=False)
+                redis_url = config.redis_url
+                logger.info(f"Connecting to Redis at: {redis_url[:40]}...")
+
+                # Handle SSL for rediss:// URLs (Render uses rediss://)
+                import ssl
+                ssl_context = None
+                if redis_url.startswith("rediss://"):
+                    ssl_context = ssl.create_default_context()
+                    ssl_context.check_hostname = False
+                    ssl_context.verify_mode = ssl.CERT_NONE
+
+                self._redis = await redis.from_url(
+                    redis_url,
+                    decode_responses=False,
+                    ssl=ssl_context
+                )
                 await self._redis.ping()
                 logger.info("Connected to Redis for persistence")
             except Exception as e:
