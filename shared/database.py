@@ -270,32 +270,16 @@ class Database:
             return
 
         try:
-            import ssl
+            logger.info(f"Attempting PostgreSQL connection...")
 
-            # Create SSL context that doesn't verify certificates
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            logger.info(f"Attempting PostgreSQL connection to: {self.database_url[:50]}...")
-
-            # Try single connection first to debug
-            try:
-                conn = await asyncpg.connect(self.database_url, ssl=ssl_ctx, timeout=30)
-                await conn.close()
-                logger.info("Single connection test passed")
-            except Exception as e:
-                logger.warning(f"Single connection test failed: {e}")
-                self._connection_error = f"single conn: {e}"
-                raise
-
-            # Now create pool
+            # The DATABASE_URL from Render includes ?sslmode=require
+            # asyncpg handles this automatically when included in the URL
+            # Don't pass ssl parameter separately - let the URL handle it
             self._pool = await asyncpg.create_pool(
                 self.database_url,
                 min_size=1,
                 max_size=5,
                 command_timeout=60,
-                ssl=ssl_ctx
             )
             logger.info(f"Connected to PostgreSQL successfully")
         except Exception as e:
