@@ -667,6 +667,16 @@ async def root():
 
 @app.get("/health")
 async def health():
+    # Get wallet info for diagnostics
+    wallet_address = None
+    wallet_balance = None
+    try:
+        if scout.x402_client.account:
+            wallet_address = scout.x402_client.account.address
+            wallet_balance = scout.x402_client.get_balance()
+    except Exception as e:
+        wallet_balance = f"error: {e}"
+
     return {
         "status": "healthy",
         "running": scout.running,
@@ -677,7 +687,9 @@ async def health():
         "mutual_work_verification": True,
         "spending_model_commitment": scout.spending_model_commitment,
         "quality_model_commitment": scout.quality_model_commitment,
-        "zkml_available": authorization_prover.prover.zkml_available
+        "zkml_available": authorization_prover.prover.zkml_available,
+        "wallet_address": wallet_address,
+        "wallet_balance_usdc": wallet_balance
     }
 
 

@@ -675,6 +675,16 @@ async def agent_card():
 
 @app.get("/health")
 async def health():
+    # Get wallet info for diagnostics
+    wallet_address = None
+    wallet_balance = None
+    try:
+        if analyst_agent.x402_client.account:
+            wallet_address = analyst_agent.x402_client.account.address
+            wallet_balance = analyst_agent.x402_client.get_balance()
+    except Exception as e:
+        wallet_balance = f"error: {e}"
+
     return {
         "status": "healthy",
         "production_mode": config.production_mode,
@@ -688,7 +698,9 @@ async def health():
         "zkml_available": classifier_prover.prover.zkml_available,
         "real_proofs_enabled": classifier_prover.prover.zkml_available,
         "payment_flow": "circular",  # Analyst ←→ Scout
-        "total_feedback_received": analyst_agent.total_feedback_received
+        "total_feedback_received": analyst_agent.total_feedback_received,
+        "wallet_address": wallet_address,
+        "wallet_balance_usdc": wallet_balance
     }
 
 
