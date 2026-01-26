@@ -1,85 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Info, Shield, Fuel, Wallet, ExternalLink, Cpu, History, Banknote } from 'lucide-react';
-
-interface Balance {
-  usdc: number;
-  eth: number;
-  usdcFormatted: string;
-  ethFormatted: string;
-}
-
-const TREASURY_ADDRESS = '0x6c67DBBa573326318CdE33dDa4e6D3b34f8dC303';
+import { Activity, Info, Cpu, History } from 'lucide-react';
 
 export default function Navigation() {
   const pathname = usePathname();
-  const [balance, setBalance] = useState<Balance | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const tabs = [
     { href: '/', label: 'Dashboard', icon: Activity },
     { href: '/history', label: 'History', icon: History },
     { href: '/about', label: 'About', icon: Info },
   ];
-
-  // Fetch treasury balance
-  useEffect(() => {
-    const fetchBalance = async () => {
-      try {
-        const ethResponse = await fetch('https://mainnet.base.org', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'eth_getBalance',
-            params: [TREASURY_ADDRESS, 'latest'],
-            id: 1,
-          }),
-        });
-        const ethData = await ethResponse.json();
-        const ethWei = parseInt(ethData.result, 16);
-        const ethBalance = ethWei / 1e18;
-
-        const usdcContract = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-        const balanceOfSelector = '0x70a08231';
-        const paddedAddress = TREASURY_ADDRESS.slice(2).padStart(64, '0');
-
-        const usdcResponse = await fetch('https://mainnet.base.org', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            method: 'eth_call',
-            params: [{ to: usdcContract, data: balanceOfSelector + paddedAddress }, 'latest'],
-            id: 2,
-          }),
-        });
-        const usdcData = await usdcResponse.json();
-        const usdcRaw = parseInt(usdcData.result, 16);
-        const usdcBalance = usdcRaw / 1e6;
-
-        setBalance({
-          usdc: usdcBalance,
-          eth: ethBalance,
-          usdcFormatted: usdcBalance.toFixed(4),
-          ethFormatted: ethBalance.toFixed(6),
-        });
-      } catch (err) {
-        setBalance({ usdc: 1.0, eth: 0.001, usdcFormatted: '1.0000', ethFormatted: '0.001000' });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBalance();
-    const interval = setInterval(fetchBalance, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const shortAddress = `${TREASURY_ADDRESS.slice(0, 6)}...${TREASURY_ADDRESS.slice(-4)}`;
 
   return (
     <nav className="border-b border-[#2a2a2a] bg-[#0a0a0a] sticky top-0 z-50">
@@ -147,45 +79,8 @@ export default function Navigation() {
           </div>
         </div>
 
-        {/* Bottom Row: Treasury Stats */}
-        <div className="flex items-center justify-between h-14">
-          <div className="flex items-center gap-5">
-            {/* USDC Balance */}
-            <div className="flex items-center gap-2">
-              <Banknote size={18} className="text-green-400" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-500 uppercase">Treasury</span>
-                <span className="text-base text-green-400 font-mono font-bold">
-                  {loading ? '...' : `${balance?.usdcFormatted} USDC`}
-                </span>
-              </div>
-            </div>
-
-            {/* ETH Balance */}
-            <div className="flex items-center gap-2">
-              <Fuel size={18} className="text-blue-400" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-500 uppercase">Gas</span>
-                <span className="text-base text-blue-400 font-mono font-bold">
-                  {loading ? '...' : `${balance?.ethFormatted} ETH`}
-                </span>
-              </div>
-            </div>
-
-            {/* Basescan Link */}
-            <a
-              href={`https://basescan.org/address/${TREASURY_ADDRESS}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300"
-            >
-              <Wallet size={14} />
-              <span className="font-mono">{shortAddress}</span>
-              <ExternalLink size={12} />
-            </a>
-          </div>
-
-          {/* Economy info */}
+        {/* Bottom Row: Tagline */}
+        <div className="flex items-center justify-center h-10">
           <div className="flex items-center gap-4 text-xs text-gray-400">
             <span className="text-cyan-400">Autonomous Agent-to-Agent commerce</span>
             <span className="text-gray-500">•</span>
