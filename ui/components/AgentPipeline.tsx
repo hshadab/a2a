@@ -11,6 +11,12 @@ const WALLET_ADDRESSES = {
   scout: '0x269CBA662fE55c4fe1212c609090A31844C36ab8',
 };
 
+// Agent A2A endpoints
+const AGENT_URLS = {
+  analyst: 'https://threat-intel-analyst.onrender.com',
+  scout: 'https://threat-intel-scout.onrender.com',
+};
+
 interface AgentEvent {
   type: string;
   timestamp: string;
@@ -280,6 +286,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           version="2.1.0"
           icon={<Microscope size={20} />}
           state={agentStates.analyst}
+          agentUrl={AGENT_URLS.analyst}
+          skillId="classify-urls"
           walletAddress={WALLET_ADDRESSES.analyst}
           walletBalance={walletBalances.analyst}
           stats={{
@@ -388,6 +396,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           version="2.1.0"
           icon={<Search size={20} />}
           state={agentStates.scout}
+          agentUrl={AGENT_URLS.scout}
+          skillId="discover-url"
           walletAddress={WALLET_ADDRESSES.scout}
           walletBalance={walletBalances.scout}
           stats={{
@@ -435,6 +445,8 @@ function AgentCard({
   version,
   icon,
   state,
+  agentUrl,
+  skillId,
   walletAddress,
   walletBalance,
   stats,
@@ -452,6 +464,8 @@ function AgentCard({
   version: string;
   icon: React.ReactNode;
   state: AgentState;
+  agentUrl: string;
+  skillId: string;
   walletAddress: string;
   walletBalance?: { usdc: number; eth: number };
   stats: { urlsProcessed: number; earned: number; spent: number };
@@ -525,17 +539,31 @@ function AgentCard({
             {statusText}
           </div>
         </div>
-        {/* Wallet Link */}
-        <a
-          href={`https://basescan.org/address/${walletAddress}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] text-gray-500 font-mono hover:text-gray-400 flex items-center gap-1 mt-2"
-        >
-          <Wallet size={10} />
-          {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-          <ExternalLink size={10} />
-        </a>
+        {/* A2A + Wallet Links */}
+        <div className="flex items-center justify-between mt-2 text-[10px]">
+          <div className="flex items-center gap-3">
+            <a
+              href={`${agentUrl}/.well-known/agent.json`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+            >
+              A2A v0.3
+              <ExternalLink size={9} />
+            </a>
+            <span className="text-gray-500 font-mono">skill:{skillId}</span>
+          </div>
+          <a
+            href={`https://basescan.org/address/${walletAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-gray-500 font-mono hover:text-gray-400 flex items-center gap-1"
+          >
+            <Wallet size={10} />
+            {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+            <ExternalLink size={9} />
+          </a>
+        </div>
       </div>
 
       {/* What It Does */}

@@ -36,14 +36,14 @@ export default function AboutPage() {
             name="URL Classifier (Analyst)"
             role="Self-Authorization + Classification"
             color="#22d3ee"
-            description="Generates and self-verifies spending proof before paying Scout (prevents rogue spending). Classifies URLs with zkML work proofs."
+            description="Spending guardrails require zkML proof of policy compliance before paying Scout. Classifies URLs with verifiable ML inference."
           />
           <AgentBox
             icon={<Search size={24} />}
             name="Threat Scout"
             role="Self-Authorization + Discovery"
             color="#3b82f6"
-            description="Generates and self-verifies spending proof before paying Analyst (prevents rogue spending). Discovers threats from CT logs, typosquatting, and feeds."
+            description="Spending guardrails require zkML proof of policy compliance before paying Analyst. Discovers threats from CT logs, typosquatting, and feeds."
           />
         </div>
 
@@ -60,7 +60,7 @@ export default function AboutPage() {
             <FlowStep number={4} text="Analyst pays Scout" />
           </div>
           <p className="text-center text-gray-500 text-xs mt-3">
-            Buyer verifies seller's work proof before paying. Each agent self-verifies spending proof. Only gas (~$0.002 per batch) is consumed.
+            Buyer verifies seller's work proof before paying. Spending guardrails require proof of policy compliance. Only gas (~$0.002) is consumed.
           </p>
         </div>
       </section>
@@ -300,7 +300,7 @@ let proof = jolt_atlas::prove(
 
         <p className="text-lg text-gray-300 mb-6 border-l-4 border-cyan-500 pl-4">
           ThreatProof demonstrates a <strong className="text-cyan-400">2-agent circular economy</strong> where
-          each agent generates and self-verifies its own spending proof before spending (prevents rogue agents).
+          spending guardrails require each agent to generate a zkML proof of policy compliance before any payment.
           USDC circulates forever. Only gas is consumed.
         </p>
 
@@ -341,7 +341,7 @@ let proof = jolt_atlas::prove(
             </div>
           </div>
           <p className="text-center text-gray-500 text-xs mt-4">
-            Each agent generates spending proof → self-verifies → pays $0.001. Net change: $0.00
+            Guardrails require spending proof → verify compliance → pay $0.001. Net change: $0.00
           </p>
         </div>
 
@@ -373,7 +373,7 @@ let proof = jolt_atlas::prove(
             <ul className="space-y-3 text-gray-400">
               <FeatureItem text="Work Proof: Seller proves they did work (Scout: quality scoring, Analyst: classification)" />
               <FeatureItem text="Buyer Verification: Buyer verifies seller's work proof before paying" />
-              <FeatureItem text="Self-Authorization: Each agent self-verifies spending proof (prevents rogue spending)" />
+              <FeatureItem text="Spending Guardrails: Each agent must prove policy compliance before any payment" />
               <FeatureItem text="zkML Guarantees: Both work and spending decisions are cryptographically verified" />
             </ul>
           </div>
