@@ -776,7 +776,7 @@ async def discover_urls(request: DiscoverRequest) -> DiscoverResponse:
     discovery_cost = DISCOVERY_PRICE_PER_BATCH  # Flat $0.001 per batch
 
     # 3. Request authorization from Policy Agent
-    await emit_policy_requesting(batch_id, len(urls))
+    await emit_policy_requesting(batch_id, len(urls), discovery_cost)
 
     try:
         auth_response = await scout._request_authorization(
