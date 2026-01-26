@@ -1,6 +1,6 @@
 # Threat Intelligence Network
 
-A long-running, compounding demonstration of **A2A + x402 + Jolt Atlas zkML**.
+A long-running, compounding demonstration of **A2A + x402 + [Jolt Atlas](https://github.com/ICME-Lab/jolt-atlas) zkML**.
 
 Two autonomous agents continuously build a threat intelligence database by discovering and classifying URLs. Each agent self-authorizes its spending with zkML proofs, creating a trustless circular micro-economy.
 
