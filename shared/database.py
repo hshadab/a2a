@@ -17,14 +17,26 @@ from .types import (
 from .config import config
 from .logging_config import database_logger as logger
 
-# Try to import asyncpg, fall back to in-memory mode
+# Try to import psycopg (v3) first, then asyncpg, fall back to in-memory mode
+# psycopg handles Render PostgreSQL SSL better than asyncpg
+PSYCOPG_AVAILABLE = False
+ASYNCPG_AVAILABLE = False
+Pool = None
+
 try:
-    import asyncpg
-    from asyncpg import Pool
-    ASYNCPG_AVAILABLE = True
+    import psycopg
+    from psycopg_pool import AsyncConnectionPool
+    PSYCOPG_AVAILABLE = True
 except ImportError:
-    ASYNCPG_AVAILABLE = False
-    Pool = None
+    pass
+
+if not PSYCOPG_AVAILABLE:
+    try:
+        import asyncpg
+        from asyncpg import Pool
+        ASYNCPG_AVAILABLE = True
+    except ImportError:
+        pass
 
 
 class InMemoryDatabase:
@@ -247,13 +259,16 @@ class Database:
     """
     Async PostgreSQL database client.
     Falls back to in-memory storage if PostgreSQL is not available.
+    Uses psycopg (v3) when available for better Render PostgreSQL compatibility.
     """
 
     def __init__(self, database_url: Optional[str] = None):
         self.database_url = database_url or config.database_url
         self._pool: Optional[Pool] = None
+        self._psycopg_pool: Optional[AsyncConnectionPool] = None
         self._in_memory: Optional[InMemoryDatabase] = None
         self._demo_mode = False
+        self._use_psycopg = False
         self._connection_error: Optional[str] = None
 
     def get_status(self) -> Dict[str, Any]:
@@ -266,7 +281,9 @@ class Database:
 
         return {
             "mode": "in-memory" if self._demo_mode else "postgresql",
-            "connected": self._pool is not None,
+            "driver": "psycopg" if self._use_psycopg else ("asyncpg" if self._pool else "none"),
+            "connected": self._pool is not None or self._psycopg_pool is not None,
+            "psycopg_available": PSYCOPG_AVAILABLE,
             "asyncpg_available": ASYNCPG_AVAILABLE,
             "database_url_configured": bool(self.database_url),
             "database_url_masked": masked_url,
@@ -275,56 +292,29 @@ class Database:
 
     async def connect(self):
         """Initialize connection pool or fall back to in-memory mode"""
-        if not ASYNCPG_AVAILABLE:
+        if not PSYCOPG_AVAILABLE and not ASYNCPG_AVAILABLE:
             if config.production_mode:
                 logger.warning(
-                    "Production mode prefers PostgreSQL but asyncpg is not available. "
+                    "Production mode prefers PostgreSQL but no driver is available. "
                     "Falling back to in-memory for debugging."
                 )
-            logger.info("asyncpg not available, using in-memory storage")
+            logger.info("No PostgreSQL driver available, using in-memory storage")
             self._demo_mode = True
             self._in_memory = InMemoryDatabase()
             await self._in_memory.connect()
             return
 
-        # Retry connection with exponential backoff
-        max_retries = 3
-        retry_delay = 2
-
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Attempting PostgreSQL connection (attempt {attempt + 1}/{max_retries})...")
-
-                # Use the full URL with sslmode parameter - let asyncpg handle it
-                # Add connection timeout to prevent hanging
-                self._pool = await asyncpg.create_pool(
-                    self.database_url,
-                    min_size=1,
-                    max_size=3,
-                    command_timeout=30,
-                    timeout=30,  # Connection timeout
-                )
-
-                # Test the connection
-                async with self._pool.acquire() as conn:
-                    await conn.fetchval('SELECT 1')
-
-                logger.info(f"Connected to PostgreSQL successfully")
-                self._connection_error = None
-
-                # Initialize schema
-                await self.init_schema()
+        # Try psycopg first (better SSL handling for Render)
+        if PSYCOPG_AVAILABLE:
+            if await self._connect_psycopg():
                 return
 
-            except Exception as e:
-                self._connection_error = f"Attempt {attempt + 1}/{max_retries}: {str(e)}"
-                logger.warning(f"PostgreSQL connection attempt {attempt + 1} failed: {e}")
-                if attempt < max_retries - 1:
-                    logger.info(f"Retrying in {retry_delay}s...")
-                    await asyncio.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
+        # Fall back to asyncpg
+        if ASYNCPG_AVAILABLE:
+            if await self._connect_asyncpg():
+                return
 
-        # All retries failed - fall back to in-memory
+        # All attempts failed - fall back to in-memory
         logger.error(f"All PostgreSQL connection attempts failed: {self._connection_error}")
         if config.production_mode:
             logger.warning(
@@ -336,8 +326,102 @@ class Database:
         self._in_memory = InMemoryDatabase()
         await self._in_memory.connect()
 
+    async def _connect_psycopg(self) -> bool:
+        """Try connecting with psycopg (v3). Returns True on success."""
+        max_retries = 3
+        retry_delay = 2
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempting PostgreSQL connection with psycopg (attempt {attempt + 1}/{max_retries})...")
+
+                # psycopg handles SSL from the connection string automatically
+                self._psycopg_pool = AsyncConnectionPool(
+                    self.database_url,
+                    min_size=1,
+                    max_size=3,
+                    open=False,  # Don't open immediately
+                )
+                await self._psycopg_pool.open()
+
+                # Test the connection
+                async with self._psycopg_pool.connection() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute('SELECT 1')
+                        await cur.fetchone()
+
+                logger.info("Connected to PostgreSQL successfully with psycopg")
+                self._use_psycopg = True
+                self._connection_error = None
+
+                # Initialize schema
+                await self.init_schema()
+                return True
+
+            except Exception as e:
+                self._connection_error = f"psycopg attempt {attempt + 1}/{max_retries}: {str(e)}"
+                logger.warning(f"psycopg connection attempt {attempt + 1} failed: {e}")
+                if self._psycopg_pool:
+                    try:
+                        await self._psycopg_pool.close()
+                    except Exception:
+                        pass
+                    self._psycopg_pool = None
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay}s...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+
+        return False
+
+    async def _connect_asyncpg(self) -> bool:
+        """Try connecting with asyncpg. Returns True on success."""
+        max_retries = 3
+        retry_delay = 2
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempting PostgreSQL connection with asyncpg (attempt {attempt + 1}/{max_retries})...")
+
+                self._pool = await asyncpg.create_pool(
+                    self.database_url,
+                    min_size=1,
+                    max_size=3,
+                    command_timeout=30,
+                    timeout=30,
+                )
+
+                # Test the connection
+                async with self._pool.acquire() as conn:
+                    await conn.fetchval('SELECT 1')
+
+                logger.info("Connected to PostgreSQL successfully with asyncpg")
+                self._connection_error = None
+
+                # Initialize schema
+                await self.init_schema()
+                return True
+
+            except Exception as e:
+                self._connection_error = f"asyncpg attempt {attempt + 1}/{max_retries}: {str(e)}"
+                logger.warning(f"asyncpg connection attempt {attempt + 1} failed: {e}")
+                if self._pool:
+                    try:
+                        await self._pool.close()
+                    except Exception:
+                        pass
+                    self._pool = None
+                if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay}s...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2
+
+        return False
+
     async def close(self):
         """Close connection pool"""
+        if self._psycopg_pool:
+            await self._psycopg_pool.close()
         if self._pool:
             await self._pool.close()
 
@@ -347,15 +431,73 @@ class Database:
         if self._demo_mode:
             yield None
             return
-        async with self._pool.acquire() as conn:
-            yield conn
+        if self._use_psycopg and self._psycopg_pool:
+            async with self._psycopg_pool.connection() as conn:
+                yield conn
+        else:
+            async with self._pool.acquire() as conn:
+                yield conn
 
     async def init_schema(self):
         """Initialize database schema"""
         if self._demo_mode:
             return
         async with self.acquire() as conn:
-            await conn.execute(SCHEMA_SQL)
+            if self._use_psycopg:
+                async with conn.cursor() as cur:
+                    await cur.execute(SCHEMA_SQL)
+            else:
+                await conn.execute(SCHEMA_SQL)
+
+    def _convert_query_for_psycopg(self, query: str) -> str:
+        """Convert asyncpg-style query ($1, $2) to psycopg-style (%s)."""
+        import re
+        # First, escape any existing % that aren't parameter markers
+        # (e.g., the % operator used in pg_trgm for similarity)
+        escaped = query.replace('%', '%%')
+        # Then convert $1, $2, etc. to %s
+        converted = re.sub(r'\$(\d+)', '%s', escaped)
+        return converted
+
+    async def _execute(self, conn, query: str, *args):
+        """Execute a query with driver abstraction."""
+        if self._use_psycopg:
+            psycopg_query = self._convert_query_for_psycopg(query)
+            async with conn.cursor() as cur:
+                await cur.execute(psycopg_query, args if args else None)
+        else:
+            await conn.execute(query, *args)
+
+    async def _fetchval(self, conn, query: str, *args):
+        """Fetch a single value with driver abstraction."""
+        if self._use_psycopg:
+            psycopg_query = self._convert_query_for_psycopg(query)
+            async with conn.cursor() as cur:
+                await cur.execute(psycopg_query, args if args else None)
+                row = await cur.fetchone()
+                return row[0] if row else None
+        else:
+            return await conn.fetchval(query, *args)
+
+    async def _fetchrow(self, conn, query: str, *args):
+        """Fetch a single row with driver abstraction."""
+        if self._use_psycopg:
+            psycopg_query = self._convert_query_for_psycopg(query)
+            async with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+                await cur.execute(psycopg_query, args if args else None)
+                return await cur.fetchone()
+        else:
+            return await conn.fetchrow(query, *args)
+
+    async def _fetch(self, conn, query: str, *args):
+        """Fetch multiple rows with driver abstraction."""
+        if self._use_psycopg:
+            psycopg_query = self._convert_query_for_psycopg(query)
+            async with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
+                await cur.execute(psycopg_query, args if args else None)
+                return await cur.fetchall()
+        else:
+            return await conn.fetch(query, *args)
 
     # ============ Delegate to in-memory if in demo mode ============
 
@@ -363,7 +505,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.insert_classification(record)
         async with self.acquire() as conn:
-            await conn.execute("""
+            await self._execute(conn, """
                 INSERT INTO classifications (
                     id, url, domain, classification, confidence,
                     proof_hash, model_commitment, input_commitment, output_commitment,
@@ -385,31 +527,52 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.insert_classifications_batch(records)
         async with self.acquire() as conn:
-            async with conn.transaction():
-                for record in records:
-                    await conn.execute("""
-                        INSERT INTO classifications (
-                            id, url, domain, classification, confidence,
-                            proof_hash, model_commitment, input_commitment, output_commitment,
-                            features, context_used, source, batch_id,
-                            analyst_paid_usdc, policy_proof_hash, classified_at
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-                    """,
-                        record.id, record.url, record.domain, record.classification.value,
-                        record.confidence, record.proof_hash, record.model_commitment,
-                        record.input_commitment, record.output_commitment,
-                        json.dumps(record.features) if record.features else None,
-                        json.dumps(record.context_used) if record.context_used else None,
-                        record.source, record.batch_id, record.analyst_paid_usdc,
-                        record.policy_proof_hash, record.classified_at
-                    )
-                    await self._update_domain_stats(conn, record.domain, record.classification)
+            if self._use_psycopg:
+                async with conn.transaction():
+                    for record in records:
+                        await self._execute(conn, """
+                            INSERT INTO classifications (
+                                id, url, domain, classification, confidence,
+                                proof_hash, model_commitment, input_commitment, output_commitment,
+                                features, context_used, source, batch_id,
+                                analyst_paid_usdc, policy_proof_hash, classified_at
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                        """,
+                            record.id, record.url, record.domain, record.classification.value,
+                            record.confidence, record.proof_hash, record.model_commitment,
+                            record.input_commitment, record.output_commitment,
+                            json.dumps(record.features) if record.features else None,
+                            json.dumps(record.context_used) if record.context_used else None,
+                            record.source, record.batch_id, record.analyst_paid_usdc,
+                            record.policy_proof_hash, record.classified_at
+                        )
+                        await self._update_domain_stats(conn, record.domain, record.classification)
+            else:
+                async with conn.transaction():
+                    for record in records:
+                        await self._execute(conn, """
+                            INSERT INTO classifications (
+                                id, url, domain, classification, confidence,
+                                proof_hash, model_commitment, input_commitment, output_commitment,
+                                features, context_used, source, batch_id,
+                                analyst_paid_usdc, policy_proof_hash, classified_at
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                        """,
+                            record.id, record.url, record.domain, record.classification.value,
+                            record.confidence, record.proof_hash, record.model_commitment,
+                            record.input_commitment, record.output_commitment,
+                            json.dumps(record.features) if record.features else None,
+                            json.dumps(record.context_used) if record.context_used else None,
+                            record.source, record.batch_id, record.analyst_paid_usdc,
+                            record.policy_proof_hash, record.classified_at
+                        )
+                        await self._update_domain_stats(conn, record.domain, record.classification)
 
     async def url_exists(self, url: str) -> bool:
         if self._demo_mode:
             return await self._in_memory.url_exists(url)
         async with self.acquire() as conn:
-            result = await conn.fetchval(
+            result = await self._fetchval(conn,
                 "SELECT EXISTS(SELECT 1 FROM classifications WHERE url = $1)",
                 url
             )
@@ -421,7 +584,8 @@ class Database:
         if not urls:
             return []
         async with self.acquire() as conn:
-            existing = await conn.fetch(
+            # Use $1 style - helper method converts for psycopg
+            existing = await self._fetch(conn,
                 "SELECT url FROM classifications WHERE url = ANY($1)",
                 urls
             )
@@ -432,7 +596,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_classification(url)
         async with self.acquire() as conn:
-            row = await conn.fetchrow(
+            row = await self._fetchrow(conn,
                 "SELECT * FROM classifications WHERE url = $1",
                 url
             )
@@ -444,7 +608,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.insert_batch(record)
         async with self.acquire() as conn:
-            await conn.execute("""
+            await self._execute(conn, """
                 INSERT INTO batches (
                     id, url_count, source, policy_decision, policy_proof_hash,
                     policy_paid_usdc, total_analyst_paid_usdc, created_at, completed_at
@@ -460,7 +624,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.complete_batch(batch_id, total_analyst_paid)
         async with self.acquire() as conn:
-            await conn.execute("""
+            await self._execute(conn, """
                 UPDATE batches
                 SET completed_at = $1, total_analyst_paid_usdc = $2
                 WHERE id = $3
@@ -470,13 +634,13 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_last_batch_time()
         async with self.acquire() as conn:
-            result = await conn.fetchval(
+            result = await self._fetchval(conn,
                 "SELECT MAX(created_at) FROM batches"
             )
             return result
 
     async def _update_domain_stats(self, conn, domain: str, classification: Classification):
-        await conn.execute("""
+        await self._execute(conn, """
             INSERT INTO domain_stats (domain, times_seen, phishing_count, safe_count, suspicious_count, first_seen, last_seen)
             VALUES ($1, 1, $2, $3, $4, NOW(), NOW())
             ON CONFLICT (domain) DO UPDATE SET
@@ -496,7 +660,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_domain_stats(domain)
         async with self.acquire() as conn:
-            row = await conn.fetchrow(
+            row = await self._fetchrow(conn,
                 "SELECT * FROM domain_stats WHERE domain = $1",
                 domain
             )
@@ -508,7 +672,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_similar_domains(domain, limit)
         async with self.acquire() as conn:
-            rows = await conn.fetch("""
+            rows = await self._fetch(conn, """
                 SELECT * FROM domain_stats
                 WHERE domain % $1 AND domain != $1
                 ORDER BY similarity(domain, $1) DESC
@@ -530,7 +694,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_domain_similarity(domain1, domain2)
         async with self.acquire() as conn:
-            result = await conn.fetchval(
+            result = await self._fetchval(conn,
                 "SELECT similarity($1, $2)",
                 domain1, domain2
             )
@@ -540,7 +704,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.update_registrar_stats(registrar, is_phishing)
         async with self.acquire() as conn:
-            await conn.execute("""
+            await self._execute(conn, """
                 INSERT INTO registrar_stats (registrar, domains_seen, phishing_count, last_updated)
                 VALUES ($1, 1, $2, NOW())
                 ON CONFLICT (registrar) DO UPDATE SET
@@ -553,7 +717,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_registrar_stats(registrar)
         async with self.acquire() as conn:
-            row = await conn.fetchrow(
+            row = await self._fetchrow(conn,
                 "SELECT * FROM registrar_stats WHERE registrar = $1",
                 registrar
             )
@@ -565,7 +729,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.update_ip_stats(ip, is_phishing)
         async with self.acquire() as conn:
-            await conn.execute("""
+            await self._execute(conn, """
                 INSERT INTO ip_stats (ip, domains_hosted, phishing_count, last_updated)
                 VALUES ($1, 1, $2, NOW())
                 ON CONFLICT (ip) DO UPDATE SET
@@ -578,7 +742,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_ip_stats(ip)
         async with self.acquire() as conn:
-            row = await conn.fetchrow(
+            row = await self._fetchrow(conn,
                 "SELECT * FROM ip_stats WHERE ip = $1",
                 ip
             )
@@ -624,7 +788,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_network_stats()
         async with self.acquire() as conn:
-            counts = await conn.fetchrow("""
+            counts = await self._fetchrow(conn, """
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN classification = 'PHISHING' THEN 1 ELSE 0 END) as phishing,
@@ -634,14 +798,14 @@ class Database:
                 FROM classifications
             """)
 
-            batch_stats = await conn.fetchrow("""
+            batch_stats = await self._fetchrow(conn, """
                 SELECT
                     COUNT(*) as total_batches,
                     SUM(policy_paid_usdc) as policy_paid
                 FROM batches
             """)
 
-            first_batch = await conn.fetchval(
+            first_batch = await self._fetchval(conn,
                 "SELECT MIN(created_at) FROM batches"
             )
 
@@ -662,7 +826,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_top_phishing_tlds(limit)
         async with self.acquire() as conn:
-            rows = await conn.fetch("""
+            rows = await self._fetch(conn, """
                 SELECT
                     SUBSTRING(domain FROM '\\.([^.]+)$') as tld,
                     COUNT(*) as total,
@@ -679,7 +843,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_top_phishing_registrars(limit)
         async with self.acquire() as conn:
-            rows = await conn.fetch("""
+            rows = await self._fetch(conn, """
                 SELECT * FROM registrar_stats
                 WHERE domains_seen >= 10
                 ORDER BY (phishing_count::float / domains_seen) DESC
@@ -691,7 +855,7 @@ class Database:
         if self._demo_mode:
             return await self._in_memory.get_recent_classifications(limit)
         async with self.acquire() as conn:
-            rows = await conn.fetch("""
+            rows = await self._fetch(conn, """
                 SELECT * FROM classifications
                 ORDER BY classified_at DESC
                 LIMIT $1
