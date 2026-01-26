@@ -296,12 +296,7 @@ class Database:
                 logger.info(f"Attempting PostgreSQL connection (attempt {attempt + 1}/{max_retries})...")
 
                 # Render requires SSL - asyncpg doesn't parse sslmode from URL
-                # so we must set ssl=True explicitly
-                import ssl
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
-
+                # Use ssl='require' which is the simplest approach
                 # Strip sslmode from URL as we're handling SSL separately
                 db_url = self.database_url
                 if '?sslmode=' in db_url:
@@ -314,7 +309,7 @@ class Database:
                     min_size=1,
                     max_size=5,
                     command_timeout=60,
-                    ssl=ssl_context,
+                    ssl='require',
                 )
 
                 # Test the connection
