@@ -125,12 +125,12 @@ export default function Navigation() {
           </div>
         )}
 
-        {/* Tagline - responsive */}
-        <div className="flex items-center justify-center h-8 md:h-10 border-t border-gray-800/50 md:border-t-0">
-          <div className="flex flex-col md:flex-row items-center gap-1 md:gap-4 text-[10px] md:text-xs text-gray-400">
-            <span className="text-cyan-400">Autonomous Agent-to-Agent commerce</span>
-            <span className="hidden md:inline text-gray-500">•</span>
-            <span className="text-center">zkML proofs verify correct work and spending guardrails</span>
+        {/* Tagline - left aligned, closer to nav */}
+        <div className="flex items-center justify-start h-6 md:h-7 -mt-1">
+          <div className="flex flex-row items-center gap-2 text-xs md:text-sm text-gray-400">
+            <span className="text-cyan-400 font-medium">Autonomous Agent-to-Agent commerce</span>
+            <span className="text-gray-600">•</span>
+            <span>zkML proofs verify correct work and spending guardrails</span>
           </div>
         </div>
       </div>

@@ -701,7 +701,8 @@ async def health():
         "total_feedback_received": analyst_agent.total_feedback_received,
         "wallet_address": wallet_address,
         "wallet_balance_usdc": wallet_balance,
-        "scout_url": config.scout_url
+        "scout_url": config.scout_url,
+        "database_mode": "in-memory" if db._demo_mode else "postgresql"
     }
 
 

@@ -689,7 +689,8 @@ async def health():
         "quality_model_commitment": scout.quality_model_commitment,
         "zkml_available": authorization_prover.prover.zkml_available,
         "wallet_address": wallet_address,
-        "wallet_balance_usdc": wallet_balance
+        "wallet_balance_usdc": wallet_balance,
+        "database_mode": "in-memory" if db._demo_mode else "postgresql"
     }
 
 

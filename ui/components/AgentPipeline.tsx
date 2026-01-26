@@ -307,37 +307,81 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         />
 
         {/* Connection Arrows - Desktop: horizontal, Mobile: vertical */}
-        {/* Desktop Arrows */}
-        <div className="hidden lg:flex flex-col items-center justify-center h-full min-h-[400px] w-32 relative">
-          {/* Top Arrow: Analyst → Scout (Discovery Payment) */}
+        {/* Desktop Arrows - Payment Flow */}
+        <div className="hidden lg:flex flex-col items-center justify-center h-full min-h-[400px] w-40 relative">
+          {/* Payment Flow Label */}
+          <div className="absolute -top-2 text-xs font-medium text-green-400 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            A2A Payments
+          </div>
+
+          {/* Top Arrow: Analyst → Scout (Discovery Payment) - Always glowing */}
           <div className="flex-1 flex items-center justify-center relative w-full">
-            <svg width="100" height="40" viewBox="0 0 100 40" className="overflow-visible">
-              <line x1="10" y1="20" x2="90" y2="20" stroke="#374151" strokeWidth="2" strokeDasharray={hasActivePayment ? "none" : "4 4"} />
-              <polygon points="90,20 80,15 80,25" fill="#374151" />
+            <svg width="120" height="50" viewBox="0 0 120 50" className="overflow-visible">
+              {/* Glow filter */}
+              <defs>
+                <filter id="glow-right" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {/* Background line */}
+              <line x1="5" y1="25" x2="105" y2="25" stroke="#1f2937" strokeWidth="4" strokeLinecap="round" />
+              {/* Always-on glowing arrow */}
+              <g filter="url(#glow-right)" className="animate-pulse">
+                <line x1="5" y1="25" x2="105" y2="25" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" opacity="0.8" />
+                <polygon points="115,25 100,18 100,32" fill="#22c55e" />
+              </g>
+              {/* Amount label */}
+              <text x="60" y="15" textAnchor="middle" fill="#22c55e" fontSize="11" fontFamily="monospace" fontWeight="bold">$0.001</text>
+              {/* Active payment overlay */}
               {paymentArrows.filter(a => a.direction === 'right').map(arrow => (
                 <g key={arrow.id}>
-                  <line x1="10" y1="20" x2="90" y2="20" stroke="#22c55e" strokeWidth="3" className="payment-arrow-animate" />
-                  <polygon points="90,20 80,15 80,25" fill="#22c55e" className="payment-arrow-animate" />
-                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">${arrow.amount.toFixed(3)}</text>
+                  <line x1="5" y1="25" x2="105" y2="25" stroke="#4ade80" strokeWidth="5" className="payment-arrow-animate" strokeLinecap="round" />
+                  <polygon points="115,25 100,18 100,32" fill="#4ade80" className="payment-arrow-animate" />
                 </g>
               ))}
             </svg>
-            <span className="absolute -bottom-4 text-[10px] text-gray-500 whitespace-nowrap">Discovery</span>
+            <span className="absolute -bottom-2 text-xs text-gray-400 font-medium whitespace-nowrap">Discovery →</span>
           </div>
+
+          {/* Center divider */}
+          <div className="w-full h-px bg-gray-800 my-2" />
+
           {/* Bottom Arrow: Scout → Analyst (Feedback Payment) */}
           <div className="flex-1 flex items-center justify-center relative w-full">
-            <svg width="100" height="40" viewBox="0 0 100 40" className="overflow-visible">
-              <line x1="90" y1="20" x2="10" y2="20" stroke="#374151" strokeWidth="2" strokeDasharray={hasActivePayment ? "none" : "4 4"} />
-              <polygon points="10,20 20,15 20,25" fill="#374151" />
+            <svg width="120" height="50" viewBox="0 0 120 50" className="overflow-visible">
+              {/* Glow filter */}
+              <defs>
+                <filter id="glow-left" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="2" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+              {/* Background line */}
+              <line x1="115" y1="25" x2="15" y2="25" stroke="#1f2937" strokeWidth="4" strokeLinecap="round" />
+              {/* Dimmer arrow (not always glowing) */}
+              <g opacity="0.5">
+                <line x1="115" y1="25" x2="15" y2="25" stroke="#06b6d4" strokeWidth="2" strokeLinecap="round" strokeDasharray="6 4" />
+                <polygon points="5,25 20,18 20,32" fill="#06b6d4" />
+              </g>
+              {/* Amount label */}
+              <text x="60" y="15" textAnchor="middle" fill="#06b6d4" fontSize="11" fontFamily="monospace" opacity="0.7">$0.001</text>
+              {/* Active payment overlay */}
               {paymentArrows.filter(a => a.direction === 'left').map(arrow => (
-                <g key={arrow.id}>
-                  <line x1="90" y1="20" x2="10" y2="20" stroke="#22c55e" strokeWidth="3" className="payment-arrow-animate-reverse" />
-                  <polygon points="10,20 20,15 20,25" fill="#22c55e" className="payment-arrow-animate-reverse" />
-                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">${arrow.amount.toFixed(3)}</text>
+                <g key={arrow.id} filter="url(#glow-left)">
+                  <line x1="115" y1="25" x2="15" y2="25" stroke="#22d3ee" strokeWidth="5" className="payment-arrow-animate-reverse" strokeLinecap="round" />
+                  <polygon points="5,25 20,18 20,32" fill="#22d3ee" className="payment-arrow-animate-reverse" />
                 </g>
               ))}
             </svg>
-            <span className="absolute -bottom-4 text-[10px] text-gray-500 whitespace-nowrap">Feedback</span>
+            <span className="absolute -bottom-2 text-xs text-gray-400 font-medium whitespace-nowrap">← Feedback</span>
           </div>
         </div>
 
