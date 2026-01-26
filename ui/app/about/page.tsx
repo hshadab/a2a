@@ -24,54 +24,161 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Architecture Overview (2-Agent Model) */}
-      <section className="card p-4 md:p-8">
-        <h2 className="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6 flex items-center gap-3">
-          <Shield className="text-cyan-400" size={20} />
-          <span className="text-base md:text-2xl">2-Agent Architecture</span>
-        </h2>
+      {/* Autonomous Agent-to-Agent Economy */}
+      <section className="card p-4 md:p-8 border border-cyan-500/20">
+        <div className="flex items-center justify-between mb-4 md:mb-6">
+          <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+            <Zap className="text-yellow-400" size={24} />
+            Autonomous Agent-to-Agent Economy
+          </h2>
+          <span className="hidden md:inline px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-sm text-green-400">
+            Live on Base
+          </span>
+        </div>
 
-        {/* 2 Agents with bidirectional flow */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-8">
-          <AgentBox
-            icon={<Microscope size={24} />}
-            name="URL Classifier (Analyst)"
-            role="Self-Authorization + Classification"
-            color="#22d3ee"
-            description="Spending guardrails require zkML proof of policy compliance before paying Scout. Classifies URLs with verifiable ML inference."
-          />
+        {/* The Story */}
+        <p className="text-base md:text-lg text-gray-300 mb-6 border-l-4 border-cyan-500 pl-4">
+          Scout discovers threat URLs → Analyst classifies them → Both get paid.
+          <span className="text-cyan-400 font-medium"> No humans in the loop. No trust required.</span>
+        </p>
+
+        {/* The Agents */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8">
           <AgentBox
             icon={<Search size={24} />}
             name="Threat Scout"
-            role="Self-Authorization + Discovery"
+            role="Discovery + Quality Proof"
             color="#3b82f6"
-            description="Spending guardrails require zkML proof of policy compliance before paying Analyst. Discovers threats from CT logs, typosquatting, and feeds."
+            description="Discovers suspicious URLs from PhishTank, OpenPhish, and CT logs. Generates zkML proof that quality scoring ran correctly."
+          />
+          <AgentBox
+            icon={<Microscope size={24} />}
+            name="Threat Analyst"
+            role="Classification + Work Proof"
+            color="#22d3ee"
+            description="Classifies URLs as phishing/safe/suspicious using ML. Generates zkML proof that classification model executed correctly."
           />
         </div>
 
-        {/* Flow Diagram - 2-Agent Circular Economy */}
-        <div className="bg-gray-800/50 rounded-lg p-4 md:p-6">
-          <h3 className="text-base md:text-lg font-semibold text-white mb-4">Mutual Work Verification Flow</h3>
-          {/* Desktop flow */}
-          <div className="hidden md:flex items-center justify-center gap-4 text-sm">
-            <FlowStep number={1} text="Scout discovers URLs" />
-            <ArrowRight className="text-blue-500" />
-            <FlowStep number={2} text="Scout generates work proof" />
-            <ArrowRight className="text-cyan-500" />
-            <FlowStep number={3} text="Analyst verifies work proof" />
-            <ArrowRight className="text-green-500" />
-            <FlowStep number={4} text="Analyst pays Scout" />
+        {/* The Payment Flow - Visual */}
+        <div className="bg-gray-800/50 rounded-lg p-4 md:p-6 mb-6">
+          <h3 className="text-base md:text-lg font-semibold text-white mb-4 text-center">The Payment Loop</h3>
+
+          {/* Desktop: Circular visual */}
+          <div className="hidden md:flex items-center justify-center gap-6 text-sm">
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
+                <Search className="text-blue-400" size={28} />
+              </div>
+              <span className="text-white font-medium">Scout</span>
+              <span className="block text-xs text-gray-500">discovers URL</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <div className="text-green-400 text-xs font-mono mb-1">$0.001</div>
+              <ArrowRight className="text-green-400" size={28} />
+              <div className="text-gray-500 text-[10px] mt-1">pays for discovery</div>
+            </div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
+                <Microscope className="text-cyan-400" size={28} />
+              </div>
+              <span className="text-white font-medium">Analyst</span>
+              <span className="block text-xs text-gray-500">classifies URL</span>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <div className="text-green-400 text-xs font-mono mb-1">$0.001</div>
+              <ArrowRight className="text-green-400 rotate-180" size={28} />
+              <div className="text-gray-500 text-[10px] mt-1">pays for feedback</div>
+            </div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
+                <Search className="text-blue-400" size={28} />
+              </div>
+              <span className="text-white font-medium">Scout</span>
+              <span className="block text-xs text-gray-500">receives payment</span>
+            </div>
           </div>
-          {/* Mobile flow */}
-          <div className="md:hidden space-y-3 text-sm">
-            <FlowStep number={1} text="Scout discovers URLs" />
-            <FlowStep number={2} text="Scout generates work proof" />
-            <FlowStep number={3} text="Analyst verifies work proof" />
-            <FlowStep number={4} text="Analyst pays Scout" />
+
+          {/* Mobile: Simplified vertical */}
+          <div className="md:hidden space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg">
+              <Search className="text-blue-400" size={20} />
+              <div>
+                <span className="text-white text-sm font-medium">Scout discovers URL</span>
+                <span className="block text-xs text-gray-500">generates quality proof</span>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <div className="flex items-center gap-2 text-green-400 text-xs">
+                <span>↓</span> <span className="font-mono">$0.001</span> <span>↓</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-cyan-500/10 rounded-lg">
+              <Microscope className="text-cyan-400" size={20} />
+              <div>
+                <span className="text-white text-sm font-medium">Analyst classifies URL</span>
+                <span className="block text-xs text-gray-500">generates work proof</span>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <div className="flex items-center gap-2 text-green-400 text-xs">
+                <span>↓</span> <span className="font-mono">$0.001</span> <span>↓</span>
+              </div>
+            </div>
+            <div className="text-center text-xs text-gray-500">
+              Loop repeats. Net change: $0.00
+            </div>
           </div>
-          <p className="text-center text-gray-500 text-[10px] md:text-xs mt-3">
-            Buyer verifies seller's work proof before paying. Spending guardrails require proof of policy compliance.
+
+          <p className="text-center text-gray-400 text-xs mt-4 font-medium">
+            Net per agent: <span className="text-cyan-400">$0.00</span> · Only cost: <span className="text-yellow-400">~$0.002 gas</span>
           </p>
+        </div>
+
+        {/* The Trust - Why it's trustless */}
+        <div className="bg-gray-900/50 rounded-lg p-4 md:p-6">
+          <h3 className="text-base md:text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Lock className="text-purple-400" size={18} />
+            No Trust Required
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-3">
+              <div className="flex items-start gap-2">
+                <Check className="text-green-400 mt-0.5 flex-shrink-0" size={16} />
+                <div>
+                  <span className="text-white font-medium">Work Proofs</span>
+                  <p className="text-gray-500 text-xs">Each agent proves their ML model ran correctly on the input</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Check className="text-green-400 mt-0.5 flex-shrink-0" size={16} />
+                <div>
+                  <span className="text-white font-medium">Buyer Verifies Seller</span>
+                  <p className="text-gray-500 text-xs">Payment only released after proof verification succeeds</p>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-start gap-2">
+                <Check className="text-green-400 mt-0.5 flex-shrink-0" size={16} />
+                <div>
+                  <span className="text-white font-medium">Spending Guardrails</span>
+                  <p className="text-gray-500 text-xs">zkML proof of policy compliance required before any payment</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Check className="text-green-400 mt-0.5 flex-shrink-0" size={16} />
+                <div>
+                  <span className="text-white font-medium">Model Commitments</span>
+                  <p className="text-gray-500 text-xs">Proof binds to exact ONNX model weights - no bait and switch</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -295,100 +402,6 @@ let proof = jolt_atlas::prove(
 }`} />
         </TechSection>
       </div>
-
-      {/* Agent-to-Agent Micro-Economy (2-Agent Model) */}
-      <section className="card p-8 border border-cyan-500/20">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Zap className="text-yellow-400" />
-            2-Agent Circular Economy with Self-Authorization
-          </h2>
-          <span className="px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-sm text-green-400">
-            Self-Sustaining
-          </span>
-        </div>
-
-        <p className="text-lg text-gray-300 mb-6 border-l-4 border-cyan-500 pl-4">
-          ThreatProof demonstrates a <strong className="text-cyan-400">2-agent circular economy</strong> where
-          spending guardrails require each agent to generate a zkML proof of policy compliance before any payment.
-          USDC circulates forever. Only gas is consumed.
-        </p>
-
-        {/* Circular Flow Diagram (2-Agent) */}
-        <div className="bg-gray-800/50 rounded-lg p-6 mb-6">
-          <h3 className="text-lg font-semibold text-white mb-4 text-center">2-Agent Circular Payment Flow</h3>
-          <div className="flex items-center justify-center gap-8 text-sm">
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
-                <span className="text-cyan-400 font-bold text-xl">A</span>
-              </div>
-              <span className="text-gray-400">Analyst</span>
-              <span className="block text-xs text-cyan-400">Self-Auth</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="text-green-400 text-xs mb-1">$0.001</div>
-              <ArrowRight className="text-green-400" size={32} />
-              <div className="text-cyan-400 text-xs mt-1">Discovery</div>
-            </div>
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
-                <span className="text-blue-400 font-bold text-xl">S</span>
-              </div>
-              <span className="text-gray-400">Scout</span>
-              <span className="block text-xs text-blue-400">Self-Auth</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="text-green-400 text-xs mb-1">$0.001</div>
-              <ArrowRight className="text-green-400 rotate-180" size={32} />
-              <div className="text-blue-400 text-xs mt-1">Feedback</div>
-            </div>
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
-                <span className="text-cyan-400 font-bold text-xl">A</span>
-              </div>
-              <span className="text-gray-400">Analyst</span>
-              <span className="block text-xs text-cyan-400">Receives</span>
-            </div>
-          </div>
-          <p className="text-center text-gray-500 text-xs mt-4">
-            Guardrails require spending proof → verify compliance → pay $0.001. Net change: $0.00
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-8">
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Payment Breakdown</h3>
-            <div className="bg-gray-800/50 rounded-lg p-4 space-y-2 text-sm">
-              <div className="flex justify-between text-gray-400">
-                <span>Analyst → Scout:</span>
-                <span className="text-green-400">$0.001 (discovery)</span>
-              </div>
-              <div className="flex justify-between text-gray-400">
-                <span>Scout → Analyst:</span>
-                <span className="text-green-400">$0.001 (feedback)</span>
-              </div>
-              <div className="border-t border-gray-700 pt-2 flex justify-between text-gray-400">
-                <span>Net per agent:</span>
-                <span className="text-cyan-400 font-bold">$0.00</span>
-              </div>
-              <div className="flex justify-between text-gray-400">
-                <span>Only real cost:</span>
-                <span className="text-yellow-400">~$0.002 gas (2 txns)</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Why Mutual Work Verification Matters</h3>
-            <ul className="space-y-3 text-gray-400">
-              <FeatureItem text="Work Proof: Seller proves they did work (Scout: quality scoring, Analyst: classification)" />
-              <FeatureItem text="Buyer Verification: Buyer verifies seller's work proof before paying" />
-              <FeatureItem text="Spending Guardrails: Each agent must prove policy compliance before any payment" />
-              <FeatureItem text="zkML Guarantees: Both work and spending decisions are cryptographically verified" />
-            </ul>
-          </div>
-        </div>
-      </section>
 
       {/* Tech Stack */}
       <section className="card p-4 md:p-8">
