@@ -186,13 +186,10 @@ export default function Navigation() {
           </div>
 
           {/* Economy info */}
-          <div className="flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              Self-sustaining
-            </span>
-            <span>$0.001/URL circular economy</span>
-            <span>Only gas consumed</span>
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <span className="text-cyan-400">Autonomous Agent-to-Agent commerce</span>
+            <span className="text-gray-500">•</span>
+            <span>zkML proofs verify correct work and spending guardrails</span>
           </div>
         </div>
       </div>
