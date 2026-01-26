@@ -28,7 +28,9 @@ export async function getNetworkStats(): Promise<NetworkStats> {
   if (!response.ok) {
     throw new Error('Failed to fetch stats');
   }
-  return response.json();
+  const data = await response.json();
+  // API returns nested structure {network: {...}, scout: {...}}
+  return data.network || data;
 }
 
 export async function getHealthStatus(): Promise<HealthStatus> {
