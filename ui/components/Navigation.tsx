@@ -90,11 +90,11 @@ export default function Navigation() {
           {/* Logo & Title */}
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-3">
-              {/* Novanet Logo */}
+              {/* Novanet Logo - 2/3 size */}
               <img
                 src="https://cdn.prod.website-files.com/65d52b07d5bc41614daa723f/665df12739c532f45b665fe7_logo-novanet.svg"
                 alt="Novanet"
-                className="h-8 w-auto"
+                className="h-5 w-auto"
               />
               <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 ThreatProof
