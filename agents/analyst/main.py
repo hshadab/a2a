@@ -868,6 +868,32 @@ async def debug_db():
     return result
 
 
+@app.get("/debug/redis")
+async def debug_redis():
+    """Debug Redis connection"""
+    result = {
+        "redis_url_prefix": config.redis_url[:50] + "..." if config.redis_url else None,
+        "redis_url_configured": bool(config.redis_url and config.redis_url != "redis://localhost:6379"),
+        "redis_client_exists": analyst_agent._redis is not None,
+    }
+
+    # Try to connect and ping
+    try:
+        import redis.asyncio as redis_mod
+        result["redis_version"] = getattr(redis_mod, '__version__', 'unknown')
+
+        test_redis = await redis_mod.from_url(config.redis_url, decode_responses=False)
+        await test_redis.ping()
+        result["connection_test"] = "success"
+        await test_redis.close()
+    except Exception as e:
+        import traceback
+        result["connection_test"] = f"error: {str(e)}"
+        result["traceback"] = traceback.format_exc()
+
+    return result
+
+
 @app.post("/skills/classify-url")
 async def classify_url_endpoint(
     request: ClassifyRequest,
