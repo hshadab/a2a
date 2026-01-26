@@ -1,6 +1,8 @@
 const SCOUT_URL = process.env.NEXT_PUBLIC_SCOUT_URL || 'http://localhost:8000';
 const POLICY_URL = process.env.NEXT_PUBLIC_POLICY_URL || 'http://localhost:8001';
 const ANALYST_URL = process.env.NEXT_PUBLIC_ANALYST_URL || 'http://localhost:8002';
+// Use Analyst for stats since it's doing the classifications
+const STATS_URL = ANALYST_URL;
 
 export interface NetworkStats {
   total_urls: number;
@@ -24,12 +26,13 @@ export interface HealthStatus {
 }
 
 export async function getNetworkStats(): Promise<NetworkStats> {
-  const response = await fetch(`${SCOUT_URL}/stats`);
+  // Fetch from Analyst since it's doing the classifications
+  const response = await fetch(`${STATS_URL}/stats`);
   if (!response.ok) {
     throw new Error('Failed to fetch stats');
   }
   const data = await response.json();
-  // API returns nested structure {network: {...}, scout: {...}}
+  // API returns nested structure {network: {...}, analyst: {...}}
   return data.network || data;
 }
 

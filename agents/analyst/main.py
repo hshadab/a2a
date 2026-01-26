@@ -708,8 +708,24 @@ async def health():
 
 @app.get("/stats")
 async def stats():
-    """Get analyst agent statistics"""
-    return analyst_agent.get_stats()
+    """Get analyst agent statistics in network stats format for UI compatibility"""
+    # Return in the format the UI expects (same as Scout's /stats endpoint)
+    return {
+        "network": {
+            "total_urls": analyst_agent.classifications_today,
+            "phishing_count": analyst_agent.phishing_detected_today,
+            "safe_count": analyst_agent.classifications_today - analyst_agent.phishing_detected_today,
+            "suspicious_count": 0,
+            "total_batches": analyst_agent.batches_processed,
+            "total_proofs": analyst_agent.classifications_today,
+            "treasury_balance_usdc": 0,
+            "total_spent_usdc": analyst_agent.total_spent_usdc,
+            "policy_paid_usdc": analyst_agent.total_feedback_received,  # Scout → Analyst
+            "analyst_paid_usdc": analyst_agent.total_spent_usdc,  # Analyst → Scout
+            "running_since": None
+        },
+        "analyst": analyst_agent.get_stats()
+    }
 
 
 @app.get("/debug/db")
