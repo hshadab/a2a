@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Activity, Shield, Zap, DollarSign, ArrowRight, Search, Scale, Microscope, Coins, Check, X, Wallet } from 'lucide-react';
-import ProofCard from './ProofCard';
-import VerificationChecklist from './VerificationChecklist';
+import { Search, Microscope, Wallet, ChevronDown, ChevronUp, Copy, Check, ExternalLink } from 'lucide-react';
 
 type AgentState = 'idle' | 'active' | 'working' | 'proving';
 
@@ -12,32 +10,6 @@ const WALLET_ADDRESSES = {
   analyst: '0x7ee88871fA9be48b62552F231a4976A11e559db8',
   scout: '0x269CBA662fE55c4fe1212c609090A31844C36ab8',
 };
-
-interface ProofStage {
-  name: string;
-  message: string;
-  progress_pct: number;
-}
-
-interface ProofData {
-  proof_hash: string;
-  model_commitment: string;
-  input_commitment: string;
-  output_commitment: string;
-  prove_time_ms: number;
-  proof_size_bytes: number;
-  decision?: string;
-  confidence?: number;
-  is_real_proof?: boolean;
-  stages?: ProofStage[];
-}
-
-interface VerificationCheck {
-  name: string;
-  description: string;
-  status: 'pending' | 'checking' | 'passed' | 'failed';
-  detail?: string;
-}
 
 interface AgentEvent {
   type: string;
@@ -59,10 +31,23 @@ interface AgentPipelineProps {
   } | null;
 }
 
+interface PaymentArrow {
+  id: number;
+  direction: 'left' | 'right';
+  amount: number;
+}
+
 export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelineProps) {
-  const [particles, setParticles] = useState<{ id: number; from: string; to: string }[]>([]);
-  const [proofProgress, setProofProgress] = useState<{ scout: number; analyst: number }>({ scout: 0, analyst: 0 });
   const [walletBalances, setWalletBalances] = useState<Record<string, { usdc: number; eth: number }>>({});
+  const [paymentArrows, setPaymentArrows] = useState<PaymentArrow[]>([]);
+  const [proofStats, setProofStats] = useState({
+    scout: { generated: 0, verified: 0, avgGenMs: 0, avgVerMs: 0 },
+    analyst: { generated: 0, verified: 0, avgGenMs: 0, avgVerMs: 0 },
+  });
+  const [lastProof, setLastProof] = useState<{
+    scout: { type: string; output: string; confidence: number; genMs: number; verMs: number; commitments: { input: string; output: string; proof: string } } | null;
+    analyst: { type: string; output: string; confidence: number; genMs: number; verMs: number; commitments: { input: string; output: string; proof: string } } | null;
+  }>({ scout: null, analyst: null });
 
   // Fetch wallet balances
   useEffect(() => {
@@ -73,7 +58,6 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
       for (const [agent, address] of Object.entries(WALLET_ADDRESSES)) {
         try {
-          // Fetch ETH balance
           const ethResp = await fetch('https://mainnet.base.org', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -87,7 +71,6 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           const ethData = await ethResp.json();
           const ethBalance = parseInt(ethData.result, 16) / 1e18;
 
-          // Fetch USDC balance
           const paddedAddress = address.slice(2).toLowerCase().padStart(64, '0');
           const usdcResp = await fetch('https://mainnet.base.org', {
             method: 'POST',
@@ -103,7 +86,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           const usdcBalance = parseInt(usdcData.result, 16) / 1e6;
 
           balances[agent] = { usdc: usdcBalance, eth: ethBalance };
-        } catch (e) {
+        } catch {
           balances[agent] = { usdc: 0, eth: 0 };
         }
       }
@@ -115,130 +98,93 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     return () => clearInterval(interval);
   }, []);
 
-  // Track proof state for each agent (2-Agent Model)
-  const [scoutSpendingProof, setScoutSpendingProof] = useState<ProofData | null>(null);
-  const [analystSpendingProof, setAnalystSpendingProof] = useState<ProofData | null>(null);
-  const [analystProof, setAnalystProof] = useState<ProofData | null>(null);
-  const [scoutProofStage, setScoutProofStage] = useState<ProofStage | null>(null);
-  const [analystProofStage, setAnalystProofStage] = useState<ProofStage | null>(null);
-  const [spendingVerifyChecks, setSpendingVerifyChecks] = useState<VerificationCheck[]>([]);
-  const [analystVerifyChecks, setAnalystVerifyChecks] = useState<VerificationCheck[]>([]);
-
-  // Track current payment info for annotations
-  const [currentPayment, setCurrentPayment] = useState<{ amount: number; recipient: string } | null>(null);
-
-  // Update proof state based on events (2-Agent Model)
+  // Handle payment events - trigger arrow animations
   useEffect(() => {
     if (!lastEvent) return;
 
-    switch (lastEvent.type) {
-      // Scout self-authorization events
-      case 'SCOUT_AUTHORIZING':
-        setScoutProofStage({
-          name: 'AUTHORIZING',
-          message: 'Generating spending proof...',
-          progress_pct: 50,
-        });
-        setProofProgress(prev => ({ ...prev, scout: 50 }));
-        break;
+    if (lastEvent.type === 'PAYMENT_SENDING') {
+      const direction = lastEvent.data.recipient?.includes('scout') ? 'right' : 'left';
+      const id = Date.now();
+      setPaymentArrows(prev => [...prev, { id, direction, amount: lastEvent.data.amount_usdc }]);
 
-      case 'SCOUT_AUTHORIZED':
-        setScoutProofStage(null);
-        setProofProgress(prev => ({ ...prev, scout: 100 }));
-        setScoutSpendingProof({
-          proof_hash: lastEvent.data.proof_hash || '',
-          model_commitment: '',
-          input_commitment: '',
-          output_commitment: '',
-          prove_time_ms: lastEvent.data.prove_time_ms || 0,
-          proof_size_bytes: 0,
-          decision: lastEvent.data.decision,
-          confidence: lastEvent.data.confidence,
-          is_real_proof: true,
-        });
-        break;
+      // Remove arrow after animation completes
+      setTimeout(() => {
+        setPaymentArrows(prev => prev.filter(a => a.id !== id));
+      }, 1500);
+    }
 
-      // Analyst self-authorization events
-      case 'ANALYST_AUTHORIZING':
-        setAnalystProofStage({
-          name: 'AUTHORIZING',
-          message: 'Generating spending proof...',
-          progress_pct: 30,
-        });
-        break;
-
-      case 'ANALYST_AUTHORIZED':
-        setAnalystSpendingProof({
-          proof_hash: lastEvent.data.proof_hash || '',
-          model_commitment: '',
-          input_commitment: '',
-          output_commitment: '',
-          prove_time_ms: lastEvent.data.prove_time_ms || 0,
-          proof_size_bytes: 0,
-          decision: lastEvent.data.decision,
-          confidence: lastEvent.data.confidence,
-          is_real_proof: true,
-        });
-        break;
-
-      case 'ANALYST_PROVING':
-        setAnalystProofStage({
-          name: lastEvent.data.stage || 'PROVING',
-          message: lastEvent.data.message || 'Generating zkML proof...',
-          progress_pct: lastEvent.data.progress_pct || 50,
-        });
-        setProofProgress(prev => ({ ...prev, analyst: lastEvent.data.progress_pct || 50 }));
-        break;
-
-      case 'ANALYST_RESPONSE':
-        setAnalystProofStage(null);
-        setProofProgress(prev => ({ ...prev, analyst: 100 }));
-        if (lastEvent.data.proof) {
-          setAnalystProof({
-            proof_hash: lastEvent.data.proof.proof_hash || '',
-            model_commitment: lastEvent.data.proof.model_commitment || '',
-            input_commitment: lastEvent.data.proof.input_commitment || '',
-            output_commitment: lastEvent.data.proof.output_commitment || '',
-            prove_time_ms: lastEvent.data.proof.prove_time_ms || 0,
-            proof_size_bytes: lastEvent.data.proof.proof_size_bytes || 0,
-            decision: lastEvent.data.classification,
-            confidence: lastEvent.data.confidence,
-            is_real_proof: lastEvent.data.proof.is_real_proof || false,
-            stages: lastEvent.data.proof.stages,
-          });
+    // Track proof stats
+    if (lastEvent.type === 'SCOUT_AUTHORIZED') {
+      setProofStats(prev => ({
+        ...prev,
+        scout: {
+          ...prev.scout,
+          generated: prev.scout.generated + 1,
+          avgGenMs: Math.round((prev.scout.avgGenMs * prev.scout.generated + (lastEvent.data.prove_time_ms || 0)) / (prev.scout.generated + 1)),
         }
-        break;
-
-      // Spending proof verification
-      case 'SPENDING_PROOF_VERIFIED':
-        if (lastEvent.data.checks) {
-          setSpendingVerifyChecks(lastEvent.data.checks);
+      }));
+      setLastProof(prev => ({
+        ...prev,
+        scout: {
+          type: 'Spending',
+          output: lastEvent.data.decision || 'AUTHORIZED',
+          confidence: lastEvent.data.confidence || 0,
+          genMs: lastEvent.data.prove_time_ms || 0,
+          verMs: 0,
+          commitments: { input: '', output: '', proof: lastEvent.data.proof_hash || '' }
         }
-        break;
+      }));
+    }
 
-      case 'WORK_VERIFIED':
-        if (lastEvent.data.checks) {
-          setAnalystVerifyChecks(lastEvent.data.checks);
+    if (lastEvent.type === 'ANALYST_RESPONSE') {
+      setProofStats(prev => ({
+        ...prev,
+        analyst: {
+          ...prev.analyst,
+          generated: prev.analyst.generated + 1,
+          avgGenMs: Math.round((prev.analyst.avgGenMs * prev.analyst.generated + (lastEvent.data.prove_time_ms || 0)) / (prev.analyst.generated + 1)),
         }
-        break;
+      }));
+      setLastProof(prev => ({
+        ...prev,
+        analyst: {
+          type: 'Classification',
+          output: lastEvent.data.classification || 'PHISHING',
+          confidence: lastEvent.data.confidence || 0,
+          genMs: lastEvent.data.prove_time_ms || 0,
+          verMs: 0,
+          commitments: { input: '', output: '', proof: lastEvent.data.proof_hash || '' }
+        }
+      }));
+    }
 
-      case 'PAYMENT_SENDING':
-        setCurrentPayment({
-          amount: lastEvent.data.amount_usdc,
-          recipient: lastEvent.data.recipient,
-        });
-        break;
+    if (lastEvent.type === 'SPENDING_PROOF_VERIFIED') {
+      const agent = lastEvent.data.agent as 'scout' | 'analyst';
+      setProofStats(prev => ({
+        ...prev,
+        [agent]: {
+          ...prev[agent],
+          verified: prev[agent].verified + 1,
+          avgVerMs: Math.round((prev[agent].avgVerMs * prev[agent].verified + (lastEvent.data.verify_time_ms || 0)) / (prev[agent].verified + 1)),
+        }
+      }));
+    }
 
-      case 'PAYMENT_SENT':
-        setTimeout(() => setCurrentPayment(null), 2000);
-        break;
+    if (lastEvent.type === 'WORK_VERIFIED') {
+      setProofStats(prev => ({
+        ...prev,
+        analyst: {
+          ...prev.analyst,
+          verified: prev.analyst.verified + 1,
+          avgVerMs: Math.round((prev.analyst.avgVerMs * prev.analyst.verified + (lastEvent.data.verify_time_ms || 0)) / (prev.analyst.verified + 1)),
+        }
+      }));
     }
   }, [lastEvent]);
 
-  // Derive agent states from last event (2-Agent Model)
+  // Derive agent states
   const agentStates = useMemo(() => {
     const states = { scout: 'idle' as AgentState, analyst: 'idle' as AgentState };
-
     if (!lastEvent) return states;
 
     switch (lastEvent.type) {
@@ -275,49 +221,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     return states;
   }, [lastEvent]);
 
-  // Determine active flow direction (2-Agent Model: Scout ←→ Analyst)
-  const activeFlow = useMemo(() => {
-    if (!lastEvent) return null;
-
-    // Analyst → Scout: Analyst pays Scout for discovery
-    if (lastEvent.type === 'ANALYST_AUTHORIZING' ||
-        (lastEvent.type === 'PAYMENT_SENDING' && lastEvent.data.recipient?.includes('scout'))) {
-      return 'analyst-scout';
-    }
-
-    // Scout → Analyst: Scout returns URLs, Scout pays Analyst feedback
-    if (lastEvent.type === 'SCOUT_AUTHORIZING' ||
-        lastEvent.type === 'SCOUT_AUTHORIZED' ||
-        (lastEvent.type === 'PAYMENT_SENDING' && lastEvent.data.recipient?.includes('analyst'))) {
-      return 'scout-analyst';
-    }
-
-    if (lastEvent.type === 'ANALYST_PROCESSING' ||
-        lastEvent.type === 'ANALYST_PROVING' ||
-        lastEvent.type === 'SPENDING_PROOF_VERIFIED') {
-      return 'scout-analyst';
-    }
-
-    if (lastEvent.type === 'ANALYST_RESPONSE' || lastEvent.type === 'WORK_VERIFIED') {
-      return 'analyst-scout';
-    }
-
-    return null;
-  }, [lastEvent]);
-
-  // Spawn particles on flow
-  useEffect(() => {
-    if (activeFlow) {
-      const [from, to] = activeFlow.split('-');
-      const id = Date.now();
-      setParticles(prev => [...prev, { id, from, to }]);
-      setTimeout(() => {
-        setParticles(prev => prev.filter(p => p.id !== id));
-      }, 2000);
-    }
-  }, [activeFlow, lastEvent?.timestamp]);
-
-  // Filter events by agent (2-Agent Model)
+  // Filter events by agent
   const getAgentEvents = (agent: string) => {
     const prefixes: Record<string, string[]> = {
       scout: ['SCOUT', 'DATABASE'],
@@ -325,460 +229,497 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     };
     return events
       .filter(e => prefixes[agent]?.some(p => e.type.startsWith(p)))
-      .slice(0, 4);
+      .slice(0, 3);
   };
 
   const formatEventMessage = (event: AgentEvent): string => {
     switch (event.type) {
       case 'SCOUT_FOUND_URLS':
-        return `Found ${event.data.url_count} URLs`;
+        return event.data.url_count === 1 ? 'Found URL' : `Found ${event.data.url_count} URLs`;
       case 'SCOUT_AUTHORIZING':
         return 'Generating spending proof...';
       case 'SCOUT_AUTHORIZED':
-        return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}%)`;
+        return `${event.data.decision} (${((event.data.confidence || 0) * 100).toFixed(0)}%)`;
       case 'ANALYST_AUTHORIZING':
         return 'Generating spending proof...';
       case 'ANALYST_AUTHORIZED':
-        return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}%)`;
+        return `${event.data.decision} (${((event.data.confidence || 0) * 100).toFixed(0)}%)`;
       case 'ANALYST_PROCESSING':
-        return `Classifying ${event.data.url_count} URLs`;
+        return event.data.url_count === 1 ? 'Classifying URL...' : `Classifying ${event.data.url_count} URLs`;
       case 'ANALYST_PROVING':
         return 'Generating zkML proof...';
       case 'ANALYST_RESPONSE':
-        return `${event.data.phishing_count} phishing found`;
+        if (event.data.classification) {
+          return `${event.data.classification} (${((event.data.confidence || 0) * 100).toFixed(0)}%)`;
+        }
+        return `${event.data.phishing_count || 0} phishing found`;
       case 'SPENDING_PROOF_VERIFIED':
         return event.data.valid !== false ? `${event.data.agent} proof verified` : `${event.data.agent} proof FAILED`;
       case 'WORK_VERIFIED':
-        return event.data.valid !== false ? 'Work proof verified' : 'Work proof FAILED';
+        return event.data.valid !== false ? `${event.data.quality_tier || 'Work'} verified` : 'Work proof FAILED';
       case 'DATABASE_UPDATED':
-        return `+${event.data.urls_added} URLs saved`;
+        return `+${event.data.urls_added} URL${event.data.urls_added === 1 ? '' : 's'} saved`;
       default:
         return event.type;
     }
   };
 
+  const hasActivePayment = paymentArrows.length > 0;
+
   return (
-    <div className="w-full network-alive">
-      {/* Pipeline Container with SVG Connections (2-Agent Model) */}
-      <div className="relative flex items-stretch justify-center gap-8">
-        {/* SVG Layer for Connection Arrows */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ zIndex: 0 }}
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-        >
-          <defs>
-            {/* Arrow markers */}
-            <marker id="arrowRight" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" className="arrow-marker" />
-            </marker>
-            <marker id="arrowRightActive" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24" />
-            </marker>
-            <marker id="arrowLeft" markerWidth="10" markerHeight="10" refX="2" refY="5" orient="auto-start-reverse">
-              <path d="M 10 0 L 0 5 L 10 10 z" fill="#22d3ee" />
-            </marker>
-            {/* Glow filter */}
-            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
+    <div className="w-full">
+      {/* Pipeline Container */}
+      <div className="relative flex items-start justify-center gap-4">
 
-          {/* Connection: Analyst to Scout - Payment flow (Analyst pays Scout for discovery) */}
-          <line
-            x1="30" y1="42"
-            x2="70" y2="42"
-            stroke={activeFlow === 'analyst-scout' ? '#fbbf24' : '#22d3ee'}
-            strokeWidth="0.5"
-            strokeOpacity={activeFlow === 'analyst-scout' ? 1 : 0.6}
-            markerEnd={activeFlow === 'analyst-scout' ? 'url(#arrowRightActive)' : 'url(#arrowRight)'}
-            className={activeFlow === 'analyst-scout' ? '' : 'flow-line'}
-            filter={activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
-          />
-          {/* Scout to Analyst - URLs + proof, Scout pays Analyst feedback */}
-          <line
-            x1="70" y1="48"
-            x2="30" y2="48"
-            stroke={activeFlow === 'scout-analyst' ? '#fbbf24' : '#3b82f6'}
-            strokeWidth="0.5"
-            strokeOpacity={activeFlow === 'scout-analyst' ? 1 : 0.4}
-            markerEnd="url(#arrowLeft)"
-            className={activeFlow === 'scout-analyst' ? '' : 'flow-line'}
-            style={{ animationDirection: 'reverse' }}
-            filter={activeFlow === 'scout-analyst' ? 'url(#glow)' : 'none'}
-          />
-
-        </svg>
-
-        {/* Payment Annotation Overlay */}
-        {currentPayment && (
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 float-annotation">
-            <div className="bg-green-500/20 border border-green-500/50 rounded-lg px-3 py-1.5 backdrop-blur-sm">
-              <div className="flex items-center gap-2 text-green-400">
-                <Coins size={16} className="text-green-400" />
-                <span className="font-mono text-sm font-bold">{currentPayment.amount.toFixed(4)} USDC</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Flow Label Annotations (2-Agent Model) */}
-        {activeFlow === 'analyst-scout' && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
-              $0.001 + Discovery Request
-            </span>
-          </div>
-        )}
-        {activeFlow === 'scout-analyst' && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-            <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
-              URLs + Spending Proof + $0.001 Feedback
-            </span>
-          </div>
-        )}
-
-        {/* Analyst Agent - Pays Scout for discovery, receives feedback payment */}
+        {/* Analyst Agent Card */}
         <AgentCard
-          name="Threat Analysis Agent"
-          role="Self-Auth Spending + Classification"
-          icon={<Microscope size={24} />}
-          color="cyan"
-          colorHex="#22d3ee"
+          name="Analyst Agent"
+          version="2.1.0"
+          icon={<Microscope size={20} />}
           state={agentStates.analyst}
-          proofProgress={agentStates.analyst === 'proving' ? proofProgress.analyst : 0}
-          stats={[
-            { label: 'Phishing', value: stats?.phishing_count?.toLocaleString() || '0' },
-            { label: 'Earned', value: `$${(stats?.analyst_paid_usdc || 0).toFixed(3)}` },
+          walletAddress={WALLET_ADDRESSES.analyst}
+          walletBalance={walletBalances.analyst}
+          stats={{
+            urlsProcessed: stats?.phishing_count || 0,
+            earned: stats?.analyst_paid_usdc || 0,
+            spent: stats?.policy_paid_usdc || 0,
+          }}
+          models={[
+            { name: 'Authorization', size: '4.2 KB', shape: '[7]→[2]', commitment: '44965f00586bff57fa42b9e58ddaf3b2159bc2fd' },
+            { name: 'Classifier', size: '12.8 KB', shape: '[32]→[3]', commitment: '7b3e2a1f8c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f' },
           ]}
+          proofStats={proofStats.analyst}
+          lastProof={lastProof.analyst}
           events={getAgentEvents('analyst')}
           formatEvent={formatEventMessage}
-          walletBalance={walletBalances.analyst}
-          walletAddress={WALLET_ADDRESSES.analyst}
+          color="#22d3ee"
         />
 
-        {/* Spacer for SVG lines */}
-        <div className="w-32" />
+        {/* Connection Arrows */}
+        <div className="flex flex-col items-center justify-center h-full min-h-[400px] w-32 relative">
+          {/* Top Arrow: Analyst → Scout (Discovery Payment) */}
+          <div className="flex-1 flex items-center justify-center relative w-full">
+            <svg width="100" height="40" viewBox="0 0 100 40" className="overflow-visible">
+              {/* Base line */}
+              <line
+                x1="10" y1="20" x2="90" y2="20"
+                stroke="#374151"
+                strokeWidth="2"
+                strokeDasharray={hasActivePayment ? "none" : "4 4"}
+              />
+              {/* Arrow head */}
+              <polygon
+                points="90,20 80,15 80,25"
+                fill="#374151"
+              />
+              {/* Animated payment line */}
+              {paymentArrows.filter(a => a.direction === 'right').map(arrow => (
+                <g key={arrow.id}>
+                  <line
+                    x1="10" y1="20" x2="90" y2="20"
+                    stroke="#22c55e"
+                    strokeWidth="3"
+                    className="payment-arrow-animate"
+                  />
+                  <polygon
+                    points="90,20 80,15 80,25"
+                    fill="#22c55e"
+                    className="payment-arrow-animate"
+                  />
+                  {/* Payment amount label */}
+                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">
+                    ${arrow.amount.toFixed(3)}
+                  </text>
+                </g>
+              ))}
+            </svg>
+            <span className="absolute -bottom-4 text-[10px] text-gray-500 whitespace-nowrap">Discovery</span>
+          </div>
 
-        {/* Scout Agent - Self-authorizes, receives from Analyst, pays Analyst feedback */}
+          {/* Bottom Arrow: Scout → Analyst (Feedback Payment) */}
+          <div className="flex-1 flex items-center justify-center relative w-full">
+            <svg width="100" height="40" viewBox="0 0 100 40" className="overflow-visible">
+              {/* Base line */}
+              <line
+                x1="90" y1="20" x2="10" y2="20"
+                stroke="#374151"
+                strokeWidth="2"
+                strokeDasharray={hasActivePayment ? "none" : "4 4"}
+              />
+              {/* Arrow head */}
+              <polygon
+                points="10,20 20,15 20,25"
+                fill="#374151"
+              />
+              {/* Animated payment line */}
+              {paymentArrows.filter(a => a.direction === 'left').map(arrow => (
+                <g key={arrow.id}>
+                  <line
+                    x1="90" y1="20" x2="10" y2="20"
+                    stroke="#22c55e"
+                    strokeWidth="3"
+                    className="payment-arrow-animate-reverse"
+                  />
+                  <polygon
+                    points="10,20 20,15 20,25"
+                    fill="#22c55e"
+                    className="payment-arrow-animate-reverse"
+                  />
+                  {/* Payment amount label */}
+                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">
+                    ${arrow.amount.toFixed(3)}
+                  </text>
+                </g>
+              ))}
+            </svg>
+            <span className="absolute -bottom-4 text-[10px] text-gray-500 whitespace-nowrap">Feedback</span>
+          </div>
+        </div>
+
+        {/* Scout Agent Card */}
         <AgentCard
           name="Scout Agent"
-          role="Self-Auth Spending + Discovery"
-          icon={<Search size={24} />}
-          color="blue"
-          colorHex="#3b82f6"
+          version="2.1.0"
+          icon={<Search size={20} />}
           state={agentStates.scout}
-          proofProgress={agentStates.scout === 'proving' ? proofProgress.scout : 0}
-          stats={[
-            { label: 'URLs Found', value: stats?.total_urls?.toLocaleString() || '0' },
-            { label: 'Sources', value: '4' },
+          walletAddress={WALLET_ADDRESSES.scout}
+          walletBalance={walletBalances.scout}
+          stats={{
+            urlsProcessed: stats?.total_urls || 0,
+            earned: stats?.policy_paid_usdc || 0,
+            spent: stats?.analyst_paid_usdc || 0,
+          }}
+          models={[
+            { name: 'Authorization', size: '4.2 KB', shape: '[7]→[2]', commitment: '44965f00586bff57fa42b9e58ddaf3b2159bc2fd' },
+            { name: 'QualityScorer', size: '8.1 KB', shape: '[32]→[4]', commitment: '7b3e2a1f8c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f' },
           ]}
+          proofStats={proofStats.scout}
+          lastProof={lastProof.scout}
           events={getAgentEvents('scout')}
           formatEvent={formatEventMessage}
-          walletBalance={walletBalances.scout}
-          walletAddress={WALLET_ADDRESSES.scout}
+          color="#3b82f6"
         />
       </div>
 
-      {/* Flow Legend (2-Agent Model) */}
+      {/* Legend */}
       <div className="flex justify-center gap-6 mt-6 text-xs text-gray-500">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_8px_#fbbf24] status-active" />
-          <span>Discovery Request</span>
+          <div className="w-6 h-0.5 bg-gray-600" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #4b5563 0, #4b5563 4px, transparent 4px, transparent 8px)' }} />
+          <span>Idle</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] status-active" style={{ animationDelay: '0.3s' }} />
-          <span>URLs + Spending Proof</span>
+          <div className="w-6 h-0.5 bg-green-500" />
+          <span>Payment Active</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#22c55e] status-active" style={{ animationDelay: '0.6s' }} />
-          <span>$0.001 Payments</span>
-        </div>
-        <div className="flex items-center gap-2 ml-4 border-l border-gray-700 pl-4">
-          <span className="text-cyan-400">2-Agent Circular Economy</span>
-          <span className="flex gap-0.5">
-            <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
-            <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
-            <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
-          </span>
+          <span className="text-cyan-400">$0.001/URL</span>
+          <span>Per-URL Circular Economy</span>
         </div>
       </div>
-
-      {/* Proof Details Section (2-Agent Model) */}
-      {(scoutSpendingProof || analystProof || agentStates.scout === 'proving' || agentStates.analyst === 'proving') && (
-        <div className="mt-6 grid grid-cols-2 gap-4">
-          {/* Scout Spending Proof Card */}
-          <div className="space-y-3">
-            <ProofCard
-              title="Scout Spending Proof"
-              proof={scoutSpendingProof}
-              isGenerating={agentStates.scout === 'proving'}
-              currentStage={scoutProofStage}
-              color="blue"
-              colorHex="#3b82f6"
-            />
-            {spendingVerifyChecks.length > 0 && (
-              <VerificationChecklist
-                checks={spendingVerifyChecks}
-                verifyTimeMs={lastEvent?.type === 'SPENDING_PROOF_VERIFIED' ? lastEvent.data.verify_time_ms : undefined}
-              />
-            )}
-          </div>
-
-          {/* Analyst Classification Proof Card */}
-          <div className="space-y-3">
-            <ProofCard
-              title="Classification Proof"
-              proof={analystProof}
-              isGenerating={agentStates.analyst === 'proving' && !analystSpendingProof}
-              currentStage={analystProofStage}
-              color="cyan"
-              colorHex="#22d3ee"
-            />
-            {analystVerifyChecks.length > 0 && (
-              <VerificationChecklist
-                checks={analystVerifyChecks}
-                verifyTimeMs={lastEvent?.type === 'WORK_VERIFIED' ? lastEvent.data.verify_time_ms : undefined}
-              />
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-// Agent Card Component with Progress Ring
+// Agent Card Component
 function AgentCard({
   name,
-  role,
+  version,
   icon,
-  color,
-  colorHex,
   state,
-  proofProgress,
+  walletAddress,
+  walletBalance,
   stats,
+  models,
+  proofStats,
+  lastProof,
   events,
   formatEvent,
-  walletBalance,
-  walletAddress,
+  color,
 }: {
   name: string;
-  role: string;
+  version: string;
   icon: React.ReactNode;
-  color: string;
-  colorHex: string;
   state: AgentState;
-  proofProgress: number;
-  stats: { label: string; value: string }[];
+  walletAddress: string;
+  walletBalance?: { usdc: number; eth: number };
+  stats: { urlsProcessed: number; earned: number; spent: number };
+  models: { name: string; size: string; shape: string; commitment: string }[];
+  proofStats: { generated: number; verified: number; avgGenMs: number; avgVerMs: number };
+  lastProof: { type: string; output: string; confidence: number; genMs: number; verMs: number; commitments: { input: string; output: string; proof: string } } | null;
   events: AgentEvent[];
   formatEvent: (e: AgentEvent) => string;
-  walletBalance?: { usdc: number; eth: number };
-  walletAddress?: string;
+  color: string;
 }) {
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    models: false,
+    proofs: false,
+  });
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedHash(id);
+    setTimeout(() => setCopiedHash(null), 2000);
+  };
+
   const isActive = state !== 'idle';
   const isProving = state === 'proving';
   const isWorking = state === 'working';
 
-  // Calculate progress ring values
-  const radius = 32;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (proofProgress / 100) * circumference;
+  const statusText = isProving ? 'PROVING' : isWorking ? 'WORKING' : isActive ? 'ACTIVE' : 'READY';
+  const statusColor = isProving ? '#eab308' : isWorking ? '#22c55e' : isActive ? '#3b82f6' : color;
 
   return (
     <div
-      className={`flex-1 rounded-xl border bg-gray-900/50 backdrop-blur-sm transition-all duration-500 relative z-10 ${
-        isProving ? 'glow-breathe' : isWorking ? '' : 'idle-glow'
-      }`}
+      className="flex-1 max-w-md rounded-lg border bg-[#111111] transition-all duration-300"
       style={{
-        borderColor: isActive ? colorHex : `${colorHex}60`,
-        ['--glow-color' as any]: colorHex,
-        boxShadow: isWorking
-          ? `0 0 30px ${colorHex}40`
-          : isActive
-          ? `0 0 15px ${colorHex}20`
-          : `0 0 10px ${colorHex}15`,
+        borderColor: isActive ? color : '#2a2a2a',
+        boxShadow: isProving ? `0 0 20px ${color}40` : 'none',
       }}
     >
-      {/* Scan effect overlay when idle */}
-      {!isActive && (
-        <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none scan-effect" />
-      )}
-
-      {/* Ripple rings when proving */}
-      {isProving && (
-        <>
-          <div className="ripple-ring" style={{ ['--glow-color' as any]: colorHex, borderColor: colorHex }} />
-          <div className="ripple-ring" style={{ ['--glow-color' as any]: colorHex, borderColor: colorHex }} />
-          <div className="ripple-ring" style={{ ['--glow-color' as any]: colorHex, borderColor: colorHex }} />
-        </>
-      )}
-
       {/* Header */}
-      <div className={`p-4 border-b border-gray-800`} style={{ backgroundColor: `${colorHex}10` }}>
+      <div className="p-4 border-b border-[#2a2a2a]" style={{ backgroundColor: `${color}08` }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Avatar with Progress Ring */}
-            <div className="relative">
-              <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center border-2 relative ${
-                  isWorking ? 'animate-spin-slow' : isProving ? '' : 'avatar-idle'
-                }`}
-                style={{
-                  borderColor: colorHex,
-                  backgroundColor: `${colorHex}20`,
-                }}
-              >
-                <span style={{ color: colorHex }}>{icon}</span>
-              </div>
-
-              {/* Progress Ring SVG */}
-              {isProving && (
-                <svg
-                  className="absolute -inset-1 w-[72px] h-[72px] progress-ring"
-                  viewBox="0 0 72 72"
-                >
-                  {/* Background ring */}
-                  <circle
-                    cx="36"
-                    cy="36"
-                    r={radius}
-                    fill="none"
-                    stroke={`${colorHex}30`}
-                    strokeWidth="4"
-                  />
-                  {/* Progress ring */}
-                  <circle
-                    cx="36"
-                    cy="36"
-                    r={radius}
-                    fill="none"
-                    stroke={colorHex}
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={proofProgress > 0 ? strokeDashoffset : circumference}
-                    className={proofProgress === 0 ? 'progress-ring-indeterminate' : 'transition-all duration-300'}
-                    style={{ filter: `drop-shadow(0 0 6px ${colorHex})` }}
-                  />
-                </svg>
-              )}
-
-              {/* Spinning dashed ring when working */}
-              {isWorking && (
-                <div
-                  className="absolute -inset-2 rounded-full border-2 border-dashed animate-spin"
-                  style={{ borderColor: colorHex, animationDuration: '3s' }}
-                />
-              )}
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center border"
+              style={{ borderColor: color, backgroundColor: `${color}15`, color }}
+            >
+              {icon}
             </div>
-
             <div>
-              <h3 className="font-bold text-lg" style={{ color: colorHex }}>
-                {name}
-              </h3>
-              <p className="text-xs text-gray-500">{role}</p>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-white">{name}</span>
+                <span className="text-[10px] text-gray-500">v{version}</span>
+              </div>
+              <a
+                href={`https://basescan.org/address/${walletAddress}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-gray-500 font-mono hover:text-gray-400 flex items-center gap-1"
+              >
+                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                <ExternalLink size={10} />
+              </a>
             </div>
           </div>
-
-          {/* Status Badge */}
           <div
-            className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-              isProving
-                ? 'bg-yellow-500/20 text-yellow-400'
-                : isWorking
-                ? 'bg-green-500/20 text-green-400'
-                : isActive
-                ? 'bg-blue-500/20 text-blue-400'
-                : 'bg-gray-700/50'
-            }`}
-            style={{ color: !isActive ? colorHex : undefined }}
+            className="px-2 py-1 rounded text-xs font-medium flex items-center gap-1.5"
+            style={{ backgroundColor: `${statusColor}20`, color: statusColor }}
           >
-            {isProving && (
-              <span className="w-2 h-2 rounded-full bg-yellow-400 status-active" />
-            )}
-            {isWorking && (
-              <span className="w-2 h-2 rounded-full bg-green-400 status-active" />
-            )}
-            {isActive && !isProving && !isWorking && (
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
-            )}
-            {!isActive && (
-              <span className="w-2 h-2 rounded-full status-active" style={{ backgroundColor: colorHex }} />
-            )}
-            <span>
-              {isProving ? 'PROVING' : isWorking ? 'WORKING' : isActive ? 'ACTIVE' : 'READY'}
-            </span>
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: statusColor,
+                animation: isActive ? 'pulse 2s infinite' : 'none',
+              }}
+            />
+            {statusText}
           </div>
         </div>
       </div>
 
       {/* Wallet Balance */}
       {walletBalance && (
-        <div className="px-4 py-2 border-b border-gray-800 bg-gray-800/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <Wallet size={12} className="text-gray-500" />
-              <span className="text-xs text-gray-500 font-mono">
-                {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : ''}
-              </span>
+        <div className="px-4 py-2 border-b border-[#2a2a2a] bg-[#0a0a0a]">
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <Wallet size={12} />
+              <span>Balance</span>
             </div>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-green-400 font-mono font-medium">
-                ${walletBalance.usdc.toFixed(2)} USDC
-              </span>
-              <span className="text-blue-400 font-mono">
-                {walletBalance.eth.toFixed(4)} ETH
-              </span>
+            <div className="flex items-center gap-3 font-mono">
+              <span className="text-green-400">${walletBalance.usdc.toFixed(2)}</span>
+              <span className="text-blue-400">{walletBalance.eth.toFixed(4)} ETH</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Stats */}
-      <div className="p-4 border-b border-gray-800">
-        <div className="grid grid-cols-2 gap-4">
-          {stats.map((stat) => (
-            <div key={stat.label}>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">{stat.label}</p>
-              <p className="text-xl font-bold text-white">{stat.value}</p>
-            </div>
-          ))}
+      {/* Stats Row */}
+      <div className="px-4 py-3 border-b border-[#2a2a2a]">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <div className="text-lg font-bold text-white font-mono">{stats.urlsProcessed.toLocaleString()}</div>
+            <div className="text-[10px] text-gray-500 uppercase">URLs</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-green-400 font-mono">${stats.earned.toFixed(3)}</div>
+            <div className="text-[10px] text-gray-500 uppercase">Earned</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-red-400 font-mono">${stats.spent.toFixed(3)}</div>
+            <div className="text-[10px] text-gray-500 uppercase">Spent</div>
+          </div>
         </div>
+      </div>
+
+      {/* Models Section - Collapsible */}
+      <div className="border-b border-[#2a2a2a]">
+        <button
+          onClick={() => toggleSection('models')}
+          className="w-full px-4 py-2 flex items-center justify-between text-xs text-gray-400 hover:bg-[#1a1a1a] transition-colors"
+        >
+          <span className="uppercase tracking-wide">ONNX Models</span>
+          {expandedSections.models ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {expandedSections.models && (
+          <div className="px-4 pb-3">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500">
+                  <th className="text-left py-1 font-normal">Model</th>
+                  <th className="text-left py-1 font-normal">Size</th>
+                  <th className="text-left py-1 font-normal">Shape</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono">
+                {models.map((model) => (
+                  <tr key={model.name} className="text-gray-300">
+                    <td className="py-1">{model.name}</td>
+                    <td className="py-1">{model.size}</td>
+                    <td className="py-1">{model.shape}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-2 space-y-1">
+              {models.map((model) => (
+                <div key={`${model.name}-commit`} className="flex items-center gap-2 text-[10px]">
+                  <span className="text-gray-500 w-20">{model.name}:</span>
+                  <code className="text-gray-400 bg-[#1a1a1a] px-1.5 py-0.5 rounded flex-1 truncate">
+                    {model.commitment}
+                  </code>
+                  <button
+                    onClick={() => copyToClipboard(model.commitment, model.name)}
+                    className="text-gray-500 hover:text-white transition-colors"
+                  >
+                    {copiedHash === model.name ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Proofs Section - Collapsible */}
+      <div className="border-b border-[#2a2a2a]">
+        <button
+          onClick={() => toggleSection('proofs')}
+          className="w-full px-4 py-2 flex items-center justify-between text-xs text-gray-400 hover:bg-[#1a1a1a] transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="uppercase tracking-wide">Proofs</span>
+            <span className="text-gray-500 font-mono">{proofStats.generated} gen / {proofStats.verified} ver</span>
+          </div>
+          {expandedSections.proofs ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        {expandedSections.proofs && (
+          <div className="px-4 pb-3 space-y-3">
+            {/* Stats Table */}
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500">
+                  <th className="text-left py-1 font-normal">Metric</th>
+                  <th className="text-right py-1 font-normal">Value</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono text-gray-300">
+                <tr>
+                  <td className="py-1">Generated</td>
+                  <td className="py-1 text-right">{proofStats.generated}</td>
+                </tr>
+                <tr>
+                  <td className="py-1">Verified</td>
+                  <td className="py-1 text-right">{proofStats.verified}</td>
+                </tr>
+                <tr>
+                  <td className="py-1">Avg Gen Time</td>
+                  <td className="py-1 text-right">{proofStats.avgGenMs}ms</td>
+                </tr>
+                <tr>
+                  <td className="py-1">Avg Ver Time</td>
+                  <td className="py-1 text-right">{proofStats.avgVerMs}ms</td>
+                </tr>
+                <tr>
+                  <td className="py-1">Success Rate</td>
+                  <td className="py-1 text-right text-green-400">
+                    {proofStats.generated > 0 ? ((proofStats.verified / proofStats.generated) * 100).toFixed(0) : 0}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* Last Proof */}
+            {lastProof && (
+              <div className="border border-[#2a2a2a] rounded p-2 bg-[#0a0a0a]">
+                <div className="text-[10px] text-gray-500 uppercase mb-1">Last Proof</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-gray-500">Type: </span>
+                    <span className="text-white font-mono">{lastProof.type}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Output: </span>
+                    <span className="text-white font-mono">{lastProof.output}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Confidence: </span>
+                    <span className="text-white font-mono">{(lastProof.confidence * 100).toFixed(0)}%</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Gen: </span>
+                    <span className="text-white font-mono">{lastProof.genMs}ms</span>
+                  </div>
+                </div>
+                {lastProof.commitments.proof && (
+                  <div className="mt-2 flex items-center gap-2 text-[10px]">
+                    <span className="text-gray-500">Hash:</span>
+                    <code className="text-gray-400 bg-[#1a1a1a] px-1.5 py-0.5 rounded flex-1 truncate">
+                      {lastProof.commitments.proof}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(lastProof.commitments.proof, 'proof')}
+                      className="text-gray-500 hover:text-white transition-colors"
+                    >
+                      {copiedHash === 'proof' ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Activity Feed */}
       <div className="p-4">
-        <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Recent Activity</p>
-        <div className="space-y-2 min-h-[100px]">
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-2">Activity</div>
+        <div className="space-y-1.5 min-h-[60px]">
           {events.length === 0 ? (
-            <div className="flex items-center gap-2 text-sm" style={{ color: colorHex }}>
-              <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full stream-dot" style={{ backgroundColor: colorHex }} />
-                <span className="w-1.5 h-1.5 rounded-full stream-dot" style={{ backgroundColor: colorHex }} />
-                <span className="w-1.5 h-1.5 rounded-full stream-dot" style={{ backgroundColor: colorHex }} />
+            <div className="text-xs text-gray-500 flex items-center gap-2">
+              <span className="flex gap-0.5">
+                <span className="w-1 h-1 rounded-full bg-gray-500 animate-pulse" />
+                <span className="w-1 h-1 rounded-full bg-gray-500 animate-pulse" style={{ animationDelay: '0.2s' }} />
+                <span className="w-1 h-1 rounded-full bg-gray-500 animate-pulse" style={{ animationDelay: '0.4s' }} />
               </span>
-              <span className="opacity-70">Monitoring network</span>
+              Monitoring...
             </div>
           ) : (
             events.map((event, i) => (
               <div
                 key={`${event.timestamp}-${i}`}
-                className={`text-sm flex items-start gap-2 ${i === 0 ? 'text-white' : 'text-gray-500'}`}
+                className={`text-xs flex items-start gap-2 ${i === 0 ? 'text-white' : 'text-gray-500'}`}
               >
-                <span className="text-gray-600 text-xs mt-0.5">
-                  {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                <span className="text-gray-600 text-[10px] mt-0.5 font-mono w-12">
+                  {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
-                <span className={i === 0 ? 'animate-pulse' : ''}>
+                <span className={i === 0 && isActive ? 'animate-pulse' : ''}>
                   {formatEvent(event)}
-                  {i === 0 && event.type.includes('VERIFIED') && (
-                    <Check size={12} className="ml-1 text-green-400 inline" />
-                  )}
                 </span>
               </div>
             ))

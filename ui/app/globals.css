@@ -42,7 +42,7 @@ body {
 }
 
 .card {
-  @apply bg-gray-900/50 border border-gray-800 rounded-lg backdrop-blur-sm;
+  @apply bg-[#111111] border border-[#2a2a2a] rounded-lg;
 }
 
 .stat-value {
@@ -771,4 +771,92 @@ body {
 
 .bi-flow {
   animation: biFlow 3s ease-in-out infinite;
+}
+
+/* ============================================
+   PAYMENT ARROW ANIMATIONS
+   ============================================ */
+
+/* Payment arrow animation - left to right */
+@keyframes paymentArrowLTR {
+  0% {
+    stroke-dasharray: 0 100;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dasharray: 100 0;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.payment-arrow-animate {
+  animation: paymentArrowLTR 0.8s ease-out forwards;
+  filter: drop-shadow(0 0 6px #22c55e);
+}
+
+/* Payment arrow animation - right to left */
+@keyframes paymentArrowRTL {
+  0% {
+    stroke-dasharray: 0 100;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dasharray: 100 0;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.payment-arrow-animate-reverse {
+  animation: paymentArrowRTL 0.8s ease-out forwards;
+  filter: drop-shadow(0 0 6px #22c55e);
+}
+
+/* Payment amount label animation */
+@keyframes paymentAmountPop {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.payment-amount-animate {
+  animation: paymentAmountPop 1.5s ease-out forwards;
+  font-weight: bold;
+}
+
+/* Pulse animation for status dots */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Remove all backdrop-blur from old styles */
+.treasury-widget {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  /* removed: backdrop-filter: blur(8px); */
 }
