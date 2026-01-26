@@ -876,6 +876,7 @@ async def health():
         "wallet_balance_usdc": wallet_balance,
         "scout_url": config.scout_url,
         "database_mode": "in-memory" if db._demo_mode else "postgresql",
+        "database_status": db.get_status(),
         "redis_connected": analyst_agent._redis is not None,
         "redis_url_configured": bool(config.redis_url and config.redis_url != "redis://localhost:6379")
     }

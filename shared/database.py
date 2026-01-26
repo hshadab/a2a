@@ -254,6 +254,24 @@ class Database:
         self._pool: Optional[Pool] = None
         self._in_memory: Optional[InMemoryDatabase] = None
         self._demo_mode = False
+        self._connection_error: Optional[str] = None
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get database connection status for debugging."""
+        # Mask the password in the URL for safety
+        masked_url = "not configured"
+        if self.database_url:
+            import re
+            masked_url = re.sub(r':([^:@]+)@', ':***@', self.database_url)
+
+        return {
+            "mode": "in-memory" if self._demo_mode else "postgresql",
+            "connected": self._pool is not None,
+            "asyncpg_available": ASYNCPG_AVAILABLE,
+            "database_url_configured": bool(self.database_url),
+            "database_url_masked": masked_url,
+            "connection_error": self._connection_error,
+        }
 
     async def connect(self):
         """Initialize connection pool or fall back to in-memory mode"""
