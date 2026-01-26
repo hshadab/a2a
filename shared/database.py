@@ -270,16 +270,39 @@ class Database:
             return
 
         try:
-            # For Render's managed PostgreSQL, use ssl='require' which is simpler
-            # and lets asyncpg handle the SSL negotiation
-            self._pool = await asyncpg.create_pool(
-                self.database_url,
-                min_size=1,
-                max_size=5,
-                command_timeout=60,
-                ssl='require'
-            )
-            logger.info(f"Connected to PostgreSQL successfully")
+            # Render internal connections: use internal hostname (no -a suffix)
+            # and may not need SSL for internal connections
+            db_url = self.database_url
+
+            # Try internal hostname first (replace -a.oregon with .oregon for internal)
+            internal_url = db_url.replace('-a.oregon-postgres', '.oregon-postgres')
+
+            # Remove sslmode from URL for internal connections
+            if '?' in internal_url:
+                internal_url = internal_url.split('?')[0]
+
+            logger.info(f"Attempting PostgreSQL connection...")
+
+            try:
+                # Try internal connection without SSL first
+                self._pool = await asyncpg.create_pool(
+                    internal_url,
+                    min_size=1,
+                    max_size=5,
+                    command_timeout=60,
+                )
+                logger.info(f"Connected to PostgreSQL via internal hostname")
+            except Exception as e1:
+                logger.info(f"Internal connection failed ({e1}), trying external with SSL...")
+                # Fall back to external URL with SSL
+                self._pool = await asyncpg.create_pool(
+                    self.database_url.split('?')[0],
+                    min_size=1,
+                    max_size=5,
+                    command_timeout=60,
+                    ssl='require'
+                )
+                logger.info(f"Connected to PostgreSQL via external hostname with SSL")
         except Exception as e:
             self._connection_error = str(e)
             logger.warning(f"PostgreSQL connection failed: {e}")
