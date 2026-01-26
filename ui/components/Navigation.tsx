@@ -1,11 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Activity, Info, Cpu, History } from 'lucide-react';
+import { Activity, Info, Cpu, History, Menu, X } from 'lucide-react';
 
 export default function Navigation() {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const tabs = [
     { href: '/', label: 'Dashboard', icon: Activity },
@@ -15,23 +17,23 @@ export default function Navigation() {
 
   return (
     <nav className="border-b border-[#2a2a2a] bg-[#0a0a0a] sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Top Row: Logo, Title, Status */}
-        <div className="flex items-center justify-between h-20 border-b border-gray-800/50">
+      <div className="max-w-7xl mx-auto px-4 md:px-6">
+        {/* Main Row */}
+        <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo & Title */}
-          <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-3">
-              {/* Novanet Logo - 2/3 size */}
+          <div className="flex items-center gap-2 md:gap-4">
+            <Link href="/" className="flex items-center gap-2 md:gap-3">
               <img
                 src="https://cdn.prod.website-files.com/65d52b07d5bc41614daa723f/665df12739c532f45b665fe7_logo-novanet.svg"
                 alt="Novanet"
-                className="h-5 w-auto"
+                className="h-4 md:h-5 w-auto"
               />
-              <span className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+              <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 ThreatProof
               </span>
             </Link>
-            <div className="flex items-center gap-2 text-sm">
+            {/* Protocol badges - hidden on mobile */}
+            <div className="hidden lg:flex items-center gap-2 text-sm">
               <span className="text-cyan-400">Google A2A</span>
               <span className="text-green-400">x402</span>
               <a
@@ -45,8 +47,8 @@ export default function Navigation() {
             </div>
           </div>
 
-          {/* Status Indicators */}
-          <div className="flex items-center gap-4">
+          {/* Desktop: Status + Tabs */}
+          <div className="hidden md:flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
               <span className="text-sm text-green-400 font-medium">Live</span>
@@ -55,7 +57,6 @@ export default function Navigation() {
               <Cpu size={14} className="text-cyan-400" />
               <span className="text-sm text-cyan-400 font-medium">Autonomous</span>
             </div>
-            {/* Tabs */}
             <div className="flex items-center gap-2 ml-3">
               {tabs.map((tab) => {
                 const isActive = pathname === tab.href;
@@ -77,14 +78,59 @@ export default function Navigation() {
               })}
             </div>
           </div>
+
+          {/* Mobile: Status + Hamburger */}
+          <div className="flex md:hidden items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-green-400 font-medium">Live</span>
+            </div>
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 text-gray-400 hover:text-white"
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
-        {/* Bottom Row: Tagline */}
-        <div className="flex items-center justify-center h-10">
-          <div className="flex items-center gap-4 text-xs text-gray-400">
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-[#2a2a2a] py-4 space-y-2">
+            {tabs.map((tab) => {
+              const isActive = pathname === tab.href;
+              const Icon = tab.icon;
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                    isActive
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`}
+                >
+                  <Icon size={18} />
+                  {tab.label}
+                </Link>
+              );
+            })}
+            {/* Protocol badges in mobile menu */}
+            <div className="flex items-center gap-3 px-4 pt-3 border-t border-[#2a2a2a] mt-3">
+              <span className="text-xs text-cyan-400">A2A</span>
+              <span className="text-xs text-green-400">x402</span>
+              <span className="text-xs text-purple-400">zkML</span>
+            </div>
+          </div>
+        )}
+
+        {/* Tagline - responsive */}
+        <div className="flex items-center justify-center h-8 md:h-10 border-t border-gray-800/50 md:border-t-0">
+          <div className="flex flex-col md:flex-row items-center gap-1 md:gap-4 text-[10px] md:text-xs text-gray-400">
             <span className="text-cyan-400">Autonomous Agent-to-Agent commerce</span>
-            <span className="text-gray-500">•</span>
-            <span>zkML proofs verify correct work and spending guardrails</span>
+            <span className="hidden md:inline text-gray-500">•</span>
+            <span className="text-center">zkML proofs verify correct work and spending guardrails</span>
           </div>
         </div>
       </div>

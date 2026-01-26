@@ -4,33 +4,35 @@ import { ExternalLink, Shield, Zap, DollarSign, Lock, Check, ArrowRight, Github,
 
 export default function AboutPage() {
   return (
-    <div className="p-6 space-y-12">
+    <div className="p-4 md:p-6 space-y-8 md:space-y-12">
       {/* Hero Section */}
-      <section className="text-center py-12">
-        <h1 className="text-4xl font-bold text-white mb-4">
+      <section className="text-center py-8 md:py-12">
+        <h1 className="text-2xl md:text-4xl font-bold text-white mb-4">
           How <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">ThreatProof</span> Works
         </h1>
-        <p className="text-xl text-gray-400 max-w-3xl mx-auto mb-6">
+        <p className="text-base md:text-xl text-gray-400 max-w-3xl mx-auto mb-6 px-4">
           An autonomous network of AI agents that discover, classify, and verify phishing threats
           using cryptographic proofs — powered by three groundbreaking protocols.
         </p>
-        <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 rounded-full">
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-cyan-400 font-medium">Autonomous Agent-to-Agent Commerce</span>
-          <span className="text-gray-600">|</span>
-          <span className="text-gray-400 text-sm">A self-sustaining AI micro-economy</span>
+        <div className="inline-flex flex-col md:flex-row items-center gap-2 md:gap-3 px-4 md:px-6 py-3 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 rounded-2xl md:rounded-full">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-cyan-400 font-medium text-sm md:text-base">Autonomous Agent-to-Agent Commerce</span>
+          </div>
+          <span className="hidden md:inline text-gray-600">|</span>
+          <span className="text-gray-400 text-xs md:text-sm">A self-sustaining AI micro-economy</span>
         </div>
       </section>
 
       {/* Architecture Overview (2-Agent Model) */}
-      <section className="card p-8">
-        <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-          <Shield className="text-cyan-400" />
-          2-Agent Architecture with Mutual Work Verification
+      <section className="card p-4 md:p-8">
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6 flex items-center gap-3">
+          <Shield className="text-cyan-400" size={20} />
+          <span className="text-base md:text-2xl">2-Agent Architecture</span>
         </h2>
 
         {/* 2 Agents with bidirectional flow */}
-        <div className="grid grid-cols-2 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-8">
           <AgentBox
             icon={<Microscope size={24} />}
             name="URL Classifier (Analyst)"
@@ -48,9 +50,10 @@ export default function AboutPage() {
         </div>
 
         {/* Flow Diagram - 2-Agent Circular Economy */}
-        <div className="bg-gray-800/50 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">2-Agent Mutual Work Verification Flow</h3>
-          <div className="flex items-center justify-center gap-4 text-sm">
+        <div className="bg-gray-800/50 rounded-lg p-4 md:p-6">
+          <h3 className="text-base md:text-lg font-semibold text-white mb-4">Mutual Work Verification Flow</h3>
+          {/* Desktop flow */}
+          <div className="hidden md:flex items-center justify-center gap-4 text-sm">
             <FlowStep number={1} text="Scout discovers URLs" />
             <ArrowRight className="text-blue-500" />
             <FlowStep number={2} text="Scout generates work proof" />
@@ -59,8 +62,15 @@ export default function AboutPage() {
             <ArrowRight className="text-green-500" />
             <FlowStep number={4} text="Analyst pays Scout" />
           </div>
-          <p className="text-center text-gray-500 text-xs mt-3">
-            Buyer verifies seller's work proof before paying. Spending guardrails require proof of policy compliance. Only gas (~$0.002) is consumed.
+          {/* Mobile flow */}
+          <div className="md:hidden space-y-3 text-sm">
+            <FlowStep number={1} text="Scout discovers URLs" />
+            <FlowStep number={2} text="Scout generates work proof" />
+            <FlowStep number={3} text="Analyst verifies work proof" />
+            <FlowStep number={4} text="Analyst pays Scout" />
+          </div>
+          <p className="text-center text-gray-500 text-[10px] md:text-xs mt-3">
+            Buyer verifies seller's work proof before paying. Spending guardrails require proof of policy compliance.
           </p>
         </div>
       </section>
@@ -381,9 +391,9 @@ let proof = jolt_atlas::prove(
       </section>
 
       {/* Tech Stack */}
-      <section className="card p-8">
-        <h2 className="text-2xl font-bold text-white mb-6">Tech Stack</h2>
-        <div className="grid grid-cols-4 gap-4">
+      <section className="card p-4 md:p-8">
+        <h2 className="text-xl md:text-2xl font-bold text-white mb-4 md:mb-6">Tech Stack</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <TechBadge name="Python" detail="FastAPI agents" />
           <TechBadge name="Next.js" detail="React dashboard" />
           <TechBadge name="Rust" detail="Jolt Atlas prover" />
@@ -396,38 +406,38 @@ let proof = jolt_atlas::prove(
       </section>
 
       {/* Links */}
-      <section className="text-center py-8">
-        <h2 className="text-xl font-bold text-white mb-4">Learn More</h2>
-        <div className="flex justify-center gap-4">
+      <section className="text-center py-6 md:py-8">
+        <h2 className="text-lg md:text-xl font-bold text-white mb-4">Learn More</h2>
+        <div className="flex flex-col md:flex-row justify-center gap-3 md:gap-4 px-4">
           <a
             href="https://github.com/google/A2A"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors text-sm"
           >
-            <Github size={18} />
+            <Github size={16} />
             Google A2A
-            <ExternalLink size={14} />
+            <ExternalLink size={12} />
           </a>
           <a
             href="https://www.x402.org/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors text-sm"
           >
-            <DollarSign size={18} />
+            <DollarSign size={16} />
             x402 Protocol
-            <ExternalLink size={14} />
+            <ExternalLink size={12} />
           </a>
           <a
             href="https://github.com/ICME-Lab/jolt-atlas"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors text-sm"
           >
-            <Lock size={18} />
+            <Lock size={16} />
             Jolt Atlas zkML
-            <ExternalLink size={14} />
+            <ExternalLink size={12} />
           </a>
         </div>
       </section>

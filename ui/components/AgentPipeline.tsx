@@ -274,8 +274,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
   return (
     <div className="w-full">
-      {/* Pipeline Container */}
-      <div className="relative flex items-start justify-center gap-4">
+      {/* Pipeline Container - horizontal on desktop, vertical on mobile */}
+      <div className="relative flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4">
 
         {/* Analyst Agent Card */}
         <AgentCard
@@ -306,84 +306,50 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           color="#22d3ee"
         />
 
-        {/* Connection Arrows */}
-        <div className="flex flex-col items-center justify-center h-full min-h-[400px] w-32 relative">
+        {/* Connection Arrows - Desktop: horizontal, Mobile: vertical */}
+        {/* Desktop Arrows */}
+        <div className="hidden lg:flex flex-col items-center justify-center h-full min-h-[400px] w-32 relative">
           {/* Top Arrow: Analyst → Scout (Discovery Payment) */}
           <div className="flex-1 flex items-center justify-center relative w-full">
             <svg width="100" height="40" viewBox="0 0 100 40" className="overflow-visible">
-              {/* Base line */}
-              <line
-                x1="10" y1="20" x2="90" y2="20"
-                stroke="#374151"
-                strokeWidth="2"
-                strokeDasharray={hasActivePayment ? "none" : "4 4"}
-              />
-              {/* Arrow head */}
-              <polygon
-                points="90,20 80,15 80,25"
-                fill="#374151"
-              />
-              {/* Animated payment line */}
+              <line x1="10" y1="20" x2="90" y2="20" stroke="#374151" strokeWidth="2" strokeDasharray={hasActivePayment ? "none" : "4 4"} />
+              <polygon points="90,20 80,15 80,25" fill="#374151" />
               {paymentArrows.filter(a => a.direction === 'right').map(arrow => (
                 <g key={arrow.id}>
-                  <line
-                    x1="10" y1="20" x2="90" y2="20"
-                    stroke="#22c55e"
-                    strokeWidth="3"
-                    className="payment-arrow-animate"
-                  />
-                  <polygon
-                    points="90,20 80,15 80,25"
-                    fill="#22c55e"
-                    className="payment-arrow-animate"
-                  />
-                  {/* Payment amount label */}
-                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">
-                    ${arrow.amount.toFixed(3)}
-                  </text>
+                  <line x1="10" y1="20" x2="90" y2="20" stroke="#22c55e" strokeWidth="3" className="payment-arrow-animate" />
+                  <polygon points="90,20 80,15 80,25" fill="#22c55e" className="payment-arrow-animate" />
+                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">${arrow.amount.toFixed(3)}</text>
                 </g>
               ))}
             </svg>
             <span className="absolute -bottom-4 text-[10px] text-gray-500 whitespace-nowrap">Discovery</span>
           </div>
-
           {/* Bottom Arrow: Scout → Analyst (Feedback Payment) */}
           <div className="flex-1 flex items-center justify-center relative w-full">
             <svg width="100" height="40" viewBox="0 0 100 40" className="overflow-visible">
-              {/* Base line */}
-              <line
-                x1="90" y1="20" x2="10" y2="20"
-                stroke="#374151"
-                strokeWidth="2"
-                strokeDasharray={hasActivePayment ? "none" : "4 4"}
-              />
-              {/* Arrow head */}
-              <polygon
-                points="10,20 20,15 20,25"
-                fill="#374151"
-              />
-              {/* Animated payment line */}
+              <line x1="90" y1="20" x2="10" y2="20" stroke="#374151" strokeWidth="2" strokeDasharray={hasActivePayment ? "none" : "4 4"} />
+              <polygon points="10,20 20,15 20,25" fill="#374151" />
               {paymentArrows.filter(a => a.direction === 'left').map(arrow => (
                 <g key={arrow.id}>
-                  <line
-                    x1="90" y1="20" x2="10" y2="20"
-                    stroke="#22c55e"
-                    strokeWidth="3"
-                    className="payment-arrow-animate-reverse"
-                  />
-                  <polygon
-                    points="10,20 20,15 20,25"
-                    fill="#22c55e"
-                    className="payment-arrow-animate-reverse"
-                  />
-                  {/* Payment amount label */}
-                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">
-                    ${arrow.amount.toFixed(3)}
-                  </text>
+                  <line x1="90" y1="20" x2="10" y2="20" stroke="#22c55e" strokeWidth="3" className="payment-arrow-animate-reverse" />
+                  <polygon points="10,20 20,15 20,25" fill="#22c55e" className="payment-arrow-animate-reverse" />
+                  <text x="50" y="12" textAnchor="middle" fill="#22c55e" fontSize="10" fontFamily="monospace" className="payment-amount-animate">${arrow.amount.toFixed(3)}</text>
                 </g>
               ))}
             </svg>
             <span className="absolute -bottom-4 text-[10px] text-gray-500 whitespace-nowrap">Feedback</span>
+          </div>
+        </div>
+
+        {/* Mobile Arrows - Vertical between cards */}
+        <div className="flex lg:hidden items-center justify-center gap-4 py-2">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="text-cyan-400">↓</span>
+            <span>Discovery $0.001</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="text-blue-400">↑</span>
+            <span>Feedback $0.001</span>
           </div>
         </div>
 
@@ -417,8 +383,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         />
       </div>
 
-      {/* Legend */}
-      <div className="flex justify-center gap-6 mt-6 text-xs text-gray-500">
+      {/* Legend - hidden on mobile, shown on desktop */}
+      <div className="hidden md:flex justify-center gap-6 mt-6 text-xs text-gray-500">
         <div className="flex items-center gap-2">
           <div className="w-6 h-0.5 bg-gray-600" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #4b5563 0, #4b5563 4px, transparent 4px, transparent 8px)' }} />
           <span>Idle</span>
@@ -501,18 +467,18 @@ function AgentCard({
 
   return (
     <div
-      className="flex-1 max-w-md rounded-lg border bg-[#111111] transition-all duration-300"
+      className="w-full lg:flex-1 lg:max-w-md rounded-lg border bg-[#111111] transition-all duration-300"
       style={{
         borderColor: isActive ? color : '#2a2a2a',
         boxShadow: isProving ? `0 0 20px ${color}40` : 'none',
       }}
     >
       {/* Header */}
-      <div className="p-4 border-b border-[#2a2a2a]" style={{ backgroundColor: `${color}08` }}>
+      <div className="p-3 md:p-4 border-b border-[#2a2a2a]" style={{ backgroundColor: `${color}08` }}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center border"
+              className="w-8 h-8 md:w-10 md:h-10 rounded-lg flex items-center justify-center border"
               style={{ borderColor: color, backgroundColor: `${color}15`, color }}
             >
               {icon}

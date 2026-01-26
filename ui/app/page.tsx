@@ -71,9 +71,9 @@ export default function Dashboard() {
   }, [lastEvent]);
 
   return (
-    <div className="min-h-screen p-6 pt-8">
+    <div className="min-h-screen p-4 md:p-6 pt-6 md:pt-8">
       {/* Agent Pipeline Visualization */}
-      <section className="mb-8">
+      <section className="mb-6 md:mb-8">
         <AgentPipeline
           events={events}
           lastEvent={lastEvent}
@@ -81,8 +81,8 @@ export default function Dashboard() {
         />
       </section>
 
-      {/* Stats Grid */}
-      <section className="grid grid-cols-4 gap-4 mb-8">
+      {/* Stats Grid - 2 cols on mobile, 4 on desktop */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         <StatCard
           label="Total URLs"
           value={stats ? formatNumber(stats.total_urls) : '-'}
@@ -107,8 +107,8 @@ export default function Dashboard() {
         />
       </section>
 
-      {/* Economics (2-Agent Model) */}
-      <section className="grid grid-cols-4 gap-4 mb-8">
+      {/* Economics (2-Agent Model) - 2 cols on mobile, 4 on desktop */}
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         <StatCard
           label="Total Spent"
           value={stats ? formatUSDC(stats.total_spent_usdc) : '-'}
@@ -151,24 +151,24 @@ export default function Dashboard() {
       </section>
 
       {/* Agent-to-Agent Micro-Economy (2-Agent Model) */}
-      <section className="mt-8 card p-6 border border-cyan-500/20">
+      <section className="mt-6 md:mt-8 card p-4 md:p-6 border border-cyan-500/20">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
-            <Cpu className="text-cyan-400" size={20} />
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+            <Cpu className="text-cyan-400" size={18} />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Per-URL Circular Economy</h2>
-            <p className="text-sm text-gray-500">1 URL at a time with mutual work verification (Net change: $0.00)</p>
+            <h2 className="text-base md:text-lg font-semibold text-white">Per-URL Circular Economy</h2>
+            <p className="text-xs md:text-sm text-gray-500">Mutual work verification (Net: $0.00)</p>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400" />
               <span className="text-sm font-medium text-cyan-400">Analyst → Scout ($0.001/URL)</span>
             </div>
             <p className="text-xs text-gray-400">
-              Analyst verifies Scout&apos;s quality work proof, then pays for URL discovery. No valid work proof = no payment.
+              Analyst verifies Scout&apos;s quality work proof, then pays for URL discovery.
             </p>
           </div>
           <div className="space-y-2">
@@ -177,7 +177,7 @@ export default function Dashboard() {
               <span className="text-sm font-medium text-blue-400">Scout → Analyst ($0.001/URL)</span>
             </div>
             <p className="text-xs text-gray-400">
-              Scout verifies Analyst&apos;s classification proof, then pays feedback. Circle complete per URL.
+              Scout verifies Analyst&apos;s classification proof, then pays feedback.
             </p>
           </div>
         </div>
@@ -202,20 +202,20 @@ function StatCard({
   subtext?: string;
 }) {
   return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="stat-label">{label}</span>
-        {icon}
+    <div className="card p-3 md:p-4">
+      <div className="flex items-center justify-between mb-1 md:mb-2">
+        <span className="stat-label text-[10px] md:text-xs">{label}</span>
+        <span className="scale-75 md:scale-100">{icon}</span>
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className="stat-value text-white">{value}</span>
+      <div className="flex items-baseline gap-1 md:gap-2">
+        <span className="stat-value text-white text-lg md:text-2xl">{value}</span>
         {change && (
-          <span className="text-sm text-cyber-green animate-slide-in">
+          <span className="text-xs md:text-sm text-cyber-green animate-slide-in">
             {change}
           </span>
         )}
       </div>
-      {subtext && <p className="text-xs text-gray-500 mt-1">{subtext}</p>}
+      {subtext && <p className="text-[10px] md:text-xs text-gray-500 mt-1">{subtext}</p>}
     </div>
   );
 }
@@ -280,24 +280,23 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
   const hasSamples = sampleUrls && sampleUrls.length > 0;
 
   return (
-    <div className={`text-sm py-2 border-b border-gray-800/50 animate-slide-in ${color}`}>
-      <div className="flex items-start gap-3">
-        <span className="text-gray-500 w-20 flex-shrink-0">{time}</span>
-        <span className="w-6">{icon}</span>
-        <span className="flex-1">{getMessage()}</span>
+    <div className={`text-xs md:text-sm py-2 border-b border-gray-800/50 animate-slide-in ${color}`}>
+      <div className="flex items-start gap-2 md:gap-3">
+        <span className="text-gray-500 w-14 md:w-20 flex-shrink-0 text-[10px] md:text-sm">{time}</span>
+        <span className="w-4 md:w-6">{icon}</span>
+        <span className="flex-1 break-words">{getMessage()}</span>
         {(event.data.request_id || event.data.batch_id) && (
-          <span className="text-gray-600 text-xs font-mono">
+          <span className="hidden md:inline text-gray-600 text-xs font-mono">
             {(event.data.request_id || event.data.batch_id).slice(0, 8)}
           </span>
         )}
       </div>
-      {/* Show sample URLs if available */}
+      {/* Show sample URLs if available - hidden on mobile */}
       {hasSamples && (
-        <div className="ml-[116px] mt-1.5 space-y-0.5">
+        <div className="hidden md:block ml-[116px] mt-1.5 space-y-0.5">
           {sampleUrls.slice(0, 3).map((item: string | { url: string; classification: string }, i: number) => {
             const url = typeof item === 'string' ? item : item.url;
             const classification = typeof item === 'object' ? item.classification : null;
-            // Truncate long URLs
             const displayUrl = url.length > 60 ? url.slice(0, 57) + '...' : url;
             return (
               <div key={i} className="flex items-center gap-2 text-xs">
