@@ -700,7 +700,8 @@ async def health():
         "payment_flow": "circular",  # Analyst ←→ Scout
         "total_feedback_received": analyst_agent.total_feedback_received,
         "wallet_address": wallet_address,
-        "wallet_balance_usdc": wallet_balance
+        "wallet_balance_usdc": wallet_balance,
+        "scout_url": config.scout_url
     }
 
 
