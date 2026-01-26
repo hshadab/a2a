@@ -223,19 +223,26 @@ class AgentCardV3(BaseModel):
 
 
 # ============ Event Types (for WebSocket) ============
+# 2-Agent Model: Scout + Analyst with self-authorization
 
 class EventType(str, Enum):
+    # Scout events
     SCOUT_FOUND_URLS = "SCOUT_FOUND_URLS"
-    POLICY_REQUESTING = "POLICY_REQUESTING"
-    POLICY_PROVING = "POLICY_PROVING"
-    POLICY_RESPONSE = "POLICY_RESPONSE"
-    POLICY_VERIFIED = "POLICY_VERIFIED"
-    PAYMENT_SENDING = "PAYMENT_SENDING"
-    PAYMENT_SENT = "PAYMENT_SENT"
+    SCOUT_AUTHORIZING = "SCOUT_AUTHORIZING"      # Scout generating spending proof
+    SCOUT_AUTHORIZED = "SCOUT_AUTHORIZED"        # Scout spending proof complete
+    # Analyst events
+    ANALYST_AUTHORIZING = "ANALYST_AUTHORIZING"  # Analyst generating spending proof
+    ANALYST_AUTHORIZED = "ANALYST_AUTHORIZED"    # Analyst spending proof complete
     ANALYST_PROCESSING = "ANALYST_PROCESSING"
     ANALYST_PROVING = "ANALYST_PROVING"
     ANALYST_RESPONSE = "ANALYST_RESPONSE"
+    # Verification events
+    SPENDING_PROOF_VERIFIED = "SPENDING_PROOF_VERIFIED"  # Spending proof verified by recipient
     WORK_VERIFIED = "WORK_VERIFIED"
+    # Payment events
+    PAYMENT_SENDING = "PAYMENT_SENDING"
+    PAYMENT_SENT = "PAYMENT_SENT"
+    # Database events
     DATABASE_UPDATED = "DATABASE_UPDATED"
     ERROR = "ERROR"
 

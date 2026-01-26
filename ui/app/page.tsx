@@ -107,7 +107,7 @@ export default function Dashboard() {
         />
       </section>
 
-      {/* Economics */}
+      {/* Economics (2-Agent Model) */}
       <section className="grid grid-cols-4 gap-4 mb-8">
         <StatCard
           label="Total Spent"
@@ -115,14 +115,14 @@ export default function Dashboard() {
           icon={<DollarSign className="text-yellow-400" />}
         />
         <StatCard
-          label="Scout → Policy"
-          value={stats ? formatUSDC(stats.policy_paid_usdc) : '-'}
-          subtext="Authorization proofs"
-        />
-        <StatCard
           label="Analyst → Scout"
           value={stats ? formatUSDC(stats.analyst_paid_usdc) : '-'}
           subtext="URL discovery"
+        />
+        <StatCard
+          label="Scout → Analyst"
+          value={stats ? formatUSDC(stats.policy_paid_usdc) : '-'}
+          subtext="Classification feedback"
         />
         <StatCard
           label="Cost per URL"
@@ -150,43 +150,34 @@ export default function Dashboard() {
         </div>
       </section>
 
-      {/* Agent-to-Agent Micro-Economy */}
+      {/* Agent-to-Agent Micro-Economy (2-Agent Model) */}
       <section className="mt-8 card p-6 border border-cyan-500/20">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-purple-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
             <Cpu className="text-cyan-400" size={20} />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Agent-to-Agent Micro-Economy</h2>
-            <p className="text-sm text-gray-500">Circular payment flow: Analyst → Scout → Policy → Analyst</p>
+            <h2 className="text-lg font-semibold text-white">Per-URL Circular Economy</h2>
+            <p className="text-sm text-gray-500">1 URL at a time with mutual work verification (Net change: $0.00)</p>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400" />
-              <span className="text-sm font-medium text-cyan-400">Analyst → Scout</span>
+              <span className="text-sm font-medium text-cyan-400">Analyst → Scout ($0.001/URL)</span>
             </div>
             <p className="text-xs text-gray-400">
-              Analyst pays Scout $0.001 for URL discovery. Scout discovers threats from CT logs, typosquatting, and feeds.
+              Analyst verifies Scout&apos;s quality work proof, then pays for URL discovery. No valid work proof = no payment.
             </p>
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-400" />
-              <span className="text-sm font-medium text-blue-400">Scout → Policy</span>
+              <span className="text-sm font-medium text-blue-400">Scout → Analyst ($0.001/URL)</span>
             </div>
             <p className="text-xs text-gray-400">
-              Scout pays Policy $0.001 for authorization. Policy generates zkML proof of correct decision.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-400" />
-              <span className="text-sm font-medium text-purple-400">Policy → Analyst</span>
-            </div>
-            <p className="text-xs text-gray-400">
-              Policy pays Analyst $0.001 for classification feedback. Circle complete—net USDC change: $0.00.
+              Scout verifies Analyst&apos;s classification proof, then pays feedback. Circle complete per URL.
             </p>
           </div>
         </div>
@@ -237,33 +228,46 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
   const getMessage = () => {
     switch (event.type) {
       case 'SCOUT_FOUND_URLS':
-        return `Found ${event.data.url_count} URLs from ${event.data.source}`;
-      case 'POLICY_REQUESTING':
-        return `Requesting authorization for ${event.data.url_count} URLs`;
-      case 'POLICY_PROVING':
-        return 'Generating policy proof...';
-      case 'POLICY_RESPONSE':
-        return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}% confidence)`;
-      case 'POLICY_VERIFIED':
+        return event.data.url_count === 1
+          ? `Found URL from ${event.data.source}`
+          : `Found ${event.data.url_count} URLs from ${event.data.source}`;
+      case 'SCOUT_AUTHORIZING':
+        return `Scout self-authorizing ($${event.data.estimated_cost})`;
+      case 'SCOUT_AUTHORIZED':
+        return `Scout self-authorized (${(event.data.confidence * 100).toFixed(0)}% confidence)`;
+      case 'ANALYST_AUTHORIZING':
+        return `Analyst self-authorizing ($${event.data.estimated_cost})`;
+      case 'ANALYST_AUTHORIZED':
+        return `Analyst self-authorized (${(event.data.confidence * 100).toFixed(0)}% confidence)`;
+      case 'SPENDING_PROOF_VERIFIED':
         return event.data.valid !== false
-          ? `Policy proof verified in ${event.data.verify_time_ms}ms`
-          : `Policy proof verification failed (${event.data.verify_time_ms}ms)`;
+          ? `${event.data.agent} spending proof verified in ${event.data.verify_time_ms}ms`
+          : `${event.data.agent} spending proof failed (${event.data.verify_time_ms}ms)`;
       case 'PAYMENT_SENDING':
-        return `Sending ${event.data.amount_usdc} USDC`;
+        return `Sending $${event.data.amount_usdc} USDC`;
       case 'PAYMENT_SENT':
-        return `Paid ${event.data.amount_usdc} USDC (tx: ${event.data.tx_hash?.slice(0, 10)}...)`;
+        return `Paid $${event.data.amount_usdc} USDC (tx: ${event.data.tx_hash?.slice(0, 10)}...)`;
       case 'ANALYST_PROCESSING':
-        return `Processing ${event.data.url_count} URLs${event.data.progress ? ` (${event.data.progress}/${event.data.url_count})` : ''}`;
+        return event.data.url_count === 1
+          ? 'Processing URL...'
+          : `Processing ${event.data.url_count} URLs${event.data.progress ? ` (${event.data.progress}/${event.data.url_count})` : ''}`;
       case 'ANALYST_PROVING':
         return 'Generating classification proof...';
       case 'ANALYST_RESPONSE':
+        // Single URL response
+        if (event.data.classification) {
+          return `Classified: ${event.data.classification} (${(event.data.confidence * 100).toFixed(0)}% confidence)`;
+        }
+        // Legacy batch response
         return `Classified: ${event.data.phishing_count} phishing, ${event.data.safe_count} safe, ${event.data.suspicious_count} suspicious`;
       case 'WORK_VERIFIED':
         return event.data.valid !== false
-          ? `Work proof verified in ${event.data.verify_time_ms}ms`
+          ? `${event.data.quality_tier || 'Work'} proof verified in ${event.data.verify_time_ms}ms`
           : `Work proof verification failed (${event.data.verify_time_ms}ms)`;
       case 'DATABASE_UPDATED':
-        return `Added ${event.data.urls_added} URLs (total: ${event.data.total_urls})`;
+        return event.data.urls_added === 1
+          ? `Added URL (total: ${event.data.total_urls})`
+          : `Added ${event.data.urls_added} URLs (total: ${event.data.total_urls})`;
       case 'ERROR':
         return event.data.error;
       default:
@@ -281,9 +285,9 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
         <span className="text-gray-500 w-20 flex-shrink-0">{time}</span>
         <span className="w-6">{icon}</span>
         <span className="flex-1">{getMessage()}</span>
-        {event.data.batch_id && (
+        {(event.data.request_id || event.data.batch_id) && (
           <span className="text-gray-600 text-xs font-mono">
-            {event.data.batch_id.slice(0, 8)}
+            {(event.data.request_id || event.data.batch_id).slice(0, 8)}
           </span>
         )}
       </div>

@@ -662,6 +662,52 @@ class JoltAtlasProver:
                 "confidence": confidence,
                 "scores": [1 - confidence, confidence]
             }
+        elif "quality" in model_name.lower():
+            # URL Quality Scorer (Scout work proof)
+            model_path = config.quality_scorer_model_path
+            outputs = self._run_onnx_inference(model_path, inputs)
+
+            quality_tiers = ["HIGH", "MEDIUM", "LOW", "NOISE"]
+
+            if outputs is not None:
+                # Real ONNX output: [high_score, medium_score, low_score, noise_score]
+                scores = outputs[0]
+                class_idx = int(np.argmax(scores))
+                quality_tier = quality_tiers[class_idx]
+                confidence = float(scores[class_idx])
+                logger.info(f"Real ONNX quality score: {quality_tier} (confidence: {confidence:.2f})")
+                return {
+                    "quality_tier": quality_tier,
+                    "classification": quality_tier,  # Alias for compatibility
+                    "confidence": confidence,
+                    "scores": scores.tolist()
+                }
+
+            # Fallback: simulated quality scoring
+            # Higher novelty and threat indicators = higher quality
+            novelty = inputs[17] if len(inputs) > 17 else 0.5
+            threat_potential = inputs[20] if len(inputs) > 20 else 0.5
+            quality_score = (novelty + threat_potential) / 2
+
+            if quality_score > 0.7:
+                quality_tier = "HIGH"
+                confidence = min(0.99, quality_score)
+            elif quality_score > 0.4:
+                quality_tier = "MEDIUM"
+                confidence = 0.7
+            elif quality_score > 0.2:
+                quality_tier = "LOW"
+                confidence = 0.6
+            else:
+                quality_tier = "NOISE"
+                confidence = 0.8
+
+            return {
+                "quality_tier": quality_tier,
+                "classification": quality_tier,
+                "confidence": confidence,
+                "scores": [quality_score, 0.5, 0.3, 0.1]
+            }
         else:
             # URL classifier
             model_path = config.classifier_model_path
@@ -862,6 +908,119 @@ class URLClassifierProver:
         )
 
 
+# ============ URL Quality Scorer Prover (Scout Work Proof) ============
+
+class URLQualityProver:
+    """
+    Prover for URL quality scoring - Scout's work proof.
+
+    Scout uses this to prove it actually analyzed URLs and scored their quality
+    before presenting them to Analyst. Analyst verifies this proof before paying.
+    """
+
+    def __init__(self):
+        self.prover = JoltAtlasProver()
+        self.model_path = config.quality_scorer_model_path
+
+    def set_progress_callback(self, callback: Callable[[ProofStage], None]):
+        """Set callback for progress updates"""
+        self.prover.progress_callback = callback
+
+    async def prove_quality_score(
+        self,
+        url_features: List[float],
+        source_reputation: float = 0.8,
+        is_novel: bool = True,
+        age_hours: float = 1.0,
+        threat_feed_count: int = 0
+    ) -> ProofResult:
+        """
+        Generate proof for URL quality scoring.
+
+        Features (32 total):
+        0-15: URL structural features (length, entropy, etc.)
+        16: source_reputation (0-1)
+        17: is_novel (0/1)
+        18: age_hours normalized (0-1)
+        19: threat_feed_count normalized (0-1)
+        20-31: additional context + padding
+        """
+        # Ensure we have at least 16 URL features
+        if len(url_features) < 16:
+            url_features = url_features + [0.0] * (16 - len(url_features))
+
+        # Build full feature vector
+        features = url_features[:16]  # First 16 URL features
+        features.append(source_reputation)  # 16
+        features.append(1.0 if is_novel else 0.0)  # 17
+        features.append(min(age_hours / 24.0, 1.0))  # 18: normalize to 0-1
+        features.append(min(threat_feed_count / 5.0, 1.0))  # 19: normalize
+
+        # Pad to 32
+        while len(features) < 32:
+            features.append(0.0)
+
+        return await self.prover.generate_proof(
+            model_path=self.model_path,
+            inputs=features,
+            model_name="url_quality_scorer"
+        )
+
+    async def prove_batch_quality(
+        self,
+        batch_features: List[List[float]],
+        source_reputation: float = 0.8
+    ) -> ProofResult:
+        """
+        Generate a batch quality proof for multiple URLs.
+
+        This creates a single proof covering the quality assessment of all URLs.
+        """
+        # Aggregate features across the batch
+        if not batch_features:
+            # Empty batch - return minimal proof
+            return await self.prove_quality_score(
+                url_features=[0.0] * 16,
+                source_reputation=source_reputation,
+                is_novel=False,
+                age_hours=24.0,
+                threat_feed_count=5
+            )
+
+        # Average the features across all URLs in the batch
+        num_urls = len(batch_features)
+        avg_features = [0.0] * 16
+
+        for url_features in batch_features:
+            for i, val in enumerate(url_features[:16]):
+                avg_features[i] += val / num_urls
+
+        # Generate proof with aggregated features
+        return await self.prove_quality_score(
+            url_features=avg_features,
+            source_reputation=source_reputation,
+            is_novel=True,  # Batch is considered novel
+            age_hours=0.5,  # Recent discovery
+            threat_feed_count=0  # Not in feeds yet
+        )
+
+    async def verify_quality_score(
+        self,
+        proof: bytes,
+        model_commitment: str,
+        input_commitment: str,
+        output_commitment: str
+    ) -> VerifyResult:
+        """Verify a URL quality scoring proof"""
+        return await self.prover.verify_proof(
+            proof=proof,
+            model_commitment=model_commitment,
+            input_commitment=input_commitment,
+            output_commitment=output_commitment
+        )
+
+
 # Global prover instances
 authorization_prover = AuthorizationProver()
 classifier_prover = URLClassifierProver()
+quality_scorer_prover = URLQualityProver()

@@ -1,0 +1,11 @@
+{
+  "model_type": "url_quality_scorer",
+  "input_size": 32,
+  "hidden_size": 16,
+  "output_size": 4,
+  "architecture": "32 -> 16 -> 4 MLP",
+  "max_tensor_size": 512,
+  "prover_compatible": true,
+  "classes": ["HIGH", "MEDIUM", "LOW", "NOISE"],
+  "purpose": "Score URL quality/novelty for Scout work proof"
+}

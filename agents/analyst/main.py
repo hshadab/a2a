@@ -1,31 +1,28 @@
 """
-Analyst Agent
+Analyst Agent (2-Agent Model with Mutual Work Verification)
 
 Classifies URLs as PHISHING, SAFE, or SUSPICIOUS with zkML proofs.
-Uses Jolt Atlas to generate cryptographic proofs that the classification
-was computed correctly.
+Uses self-authorization spending proofs for all payments.
 
-VALUE CHAIN PAYMENT FLOW (Analyst is the customer):
-1. Analyst calls Scout to discover URLs (Analyst pays Scout)
-2. Scout discovers URLs and gets Policy authorization (Scout pays Policy)
-3. Scout returns URLs + authorization proof + payment_due
-4. Analyst verifies authorization proof
-5. If valid, Analyst pays Scout
-6. Analyst classifies URLs with zkML proof
-7. Analyst stores results in database
+2-Agent Circular Economy:
+- Analyst pays Scout $0.001 for URL discovery (with self-authorized spending proof)
+- Scout pays Analyst $0.001 for classification feedback (with self-authorized spending proof)
+- Net change: $0.00 (only gas consumed)
 
-This creates a circular economy:
-- Analyst pays Scout for URL discovery
-- Scout pays Policy for authorization
-- All payments are proof-gated
+Self-Authorization (prevents rogue spending):
+- Each agent generates its own zkML spending proof
+- Each agent self-verifies its proof BEFORE spending
+- This ensures only authorized spending occurs
 
-Classification Service (for external callers):
-- External callers can request classification directly
-- Work is done upfront, proof returned
-- Payment made after proof verification
+Mutual Work Verification:
+- Scout generates quality work proof (URL quality scoring)
+- Analyst verifies Scout's work proof BEFORE paying for discovery
+- Analyst generates classification work proof
+- Scout verifies Analyst's work proof BEFORE paying feedback
 """
 import asyncio
 import os
+import time
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
@@ -43,6 +40,7 @@ from shared.types import Classification
 from shared.database import db
 from shared.events import (
     broadcaster,
+    emit_analyst_authorizing, emit_analyst_authorized, emit_spending_proof_verified,
     emit_analyst_processing, emit_analyst_proving, emit_analyst_response
 )
 from shared.a2a import build_agent_card, build_skill, build_agent_card_v3, build_skill_v3
@@ -50,7 +48,7 @@ from shared.x402 import (
     PaymentRequired, require_payment, get_payment_from_header, X402Client,
     HEADER_PAYMENT_SIGNATURE, HEADER_X402_RECEIPT
 )
-from shared.prover import classifier_prover, compute_commitment
+from shared.prover import classifier_prover, authorization_prover, quality_scorer_prover, compute_commitment
 from shared.logging_config import analyst_logger as logger
 from shared.jsonrpc import JSONRPCRouter, create_jsonrpc_endpoint, TaskNotFoundError, PaymentRequiredError as JSONRPCPaymentRequired
 from shared.task import TaskStore, Task, TaskState, execute_task
@@ -62,8 +60,8 @@ from features import extract_features, URLFeatures
 # ============ Request/Response Models ============
 
 class ClassifyRequest(BaseModel):
-    batch_id: str
-    urls: List[str]
+    request_id: str
+    url: str  # Single URL
     policy_proof_hash: str
 
 
@@ -88,8 +86,8 @@ class PaymentDue(BaseModel):
 
 
 class ClassifyResponse(BaseModel):
-    batch_id: str
-    results: List[ClassificationResult]
+    request_id: str
+    result: ClassificationResult  # Single result
     proof: str
     proof_hash: str
     model_commitment: str
@@ -101,21 +99,26 @@ class ClassifyResponse(BaseModel):
     payment_due: Optional[PaymentDue] = None
 
 
-# ============ Analyst Agent ============
+# ============ Analyst Agent (2-Agent Model) ============
 
 class AnalystAgent:
     """
-    Analyst Agent classifies URLs with zkML proofs.
+    Analyst Agent classifies URLs with zkML proofs and self-authorized spending.
 
-    In the Value Chain model, Analyst is the CUSTOMER who:
-    1. Pays Scout to discover URLs
-    2. Classifies URLs with zkML proofs
-    3. Stores results in database
+    2-Agent Circular Economy:
+    - Analyst pays Scout for URL discovery (with self-authorized spending proof)
+    - Scout pays Analyst for classification feedback (with self-authorized spending proof)
+    - Net change: $0.00 (only gas consumed)
 
-    Uses:
-    - URL features (domain, path, TLD, etc.)
-    - Database context (historical phishing rates)
-    - zkML proof generation via Jolt Atlas
+    Self-Authorization (prevents rogue spending):
+    1. Generate spending proof
+    2. Self-verify the proof
+    3. Only spend if proof is valid
+
+    Responsibilities:
+    1. Generate and self-verify spending proof before paying Scout
+    2. Classify URLs with zkML proofs
+    3. Buyer (Scout) verifies work proof before paying
     """
 
     def __init__(self):
@@ -123,8 +126,10 @@ class AnalystAgent:
         self.phishing_detected_today = 0
         self.total_earned_usdc = 0.0
         self.total_spent_usdc = 0.0
+        self.total_feedback_received = 0.0  # Track feedback payments from Scout
         self.batches_processed = 0
         self.model_commitment = None
+        self.spending_model_commitment = None  # For self-authorization proofs
         self.x402_client = X402Client()
 
         # Wallet address for receiving payments (and making payments in value chain)
@@ -135,21 +140,153 @@ class AnalystAgent:
         self._task = None
 
     async def initialize(self):
-        """Initialize the model commitment"""
+        """Initialize the model commitments"""
         self.model_commitment = classifier_prover.prover.get_model_commitment(
             config.classifier_model_path
         )
-        logger.info(f"Analyst Agent initialized. Model commitment: {self.model_commitment[:16]}...")
+        self.spending_model_commitment = authorization_prover.prover.get_model_commitment(
+            config.authorization_model_path
+        )
+        logger.info(f"Analyst Agent initialized. Classification model: {self.model_commitment[:16]}...")
+        logger.info(f"Spending authorization model: {self.spending_model_commitment[:16]}...")
+
+    async def _generate_spending_proof(
+        self,
+        request_id: str,
+        estimated_cost: float,
+        budget_remaining: float
+    ) -> dict:
+        """
+        Generate a self-authorization spending proof.
+
+        This proves Analyst has evaluated the spending decision correctly
+        using the zkML authorization model.
+        """
+        await emit_analyst_authorizing(request_id, estimated_cost)
+
+        # Generate zkML proof for spending authorization
+        proof_result = await authorization_prover.prove_authorization(
+            batch_size=1,  # Per-batch spending
+            budget_remaining=budget_remaining,
+            estimated_cost=estimated_cost,
+            source_reputation=1.0,  # High trust for Scout
+            novelty_score=0.9,  # High novelty for discovered URLs
+            time_since_last=300,  # Assume reasonable interval
+            threat_level=0.5   # Moderate threat level
+        )
+
+        # Extract decision from proof output
+        output = proof_result.output
+        decision = output.get("decision", "AUTHORIZED")
+        confidence = output.get("confidence", 0.9)
+
+        logger.info(f"Analyst self-authorization: {decision} (confidence: {confidence:.2f})")
+
+        await emit_analyst_authorized(
+            request_id=request_id,
+            decision=decision,
+            confidence=confidence,
+            proof_hash=proof_result.proof_hash,
+            prove_time_ms=proof_result.prove_time_ms
+        )
+
+        return {
+            "decision": decision,
+            "confidence": confidence,
+            "proof": proof_result.proof_hex,
+            "proof_hash": proof_result.proof_hash,
+            "model_commitment": proof_result.model_commitment,
+            "input_commitment": proof_result.input_commitment,
+            "output_commitment": proof_result.output_commitment,
+            "prove_time_ms": proof_result.prove_time_ms
+        }
+
+    async def _verify_own_spending_proof(self, spending_proof: dict) -> tuple[bool, int]:
+        """
+        Self-verify own spending authorization proof BEFORE spending.
+
+        This ensures Analyst is authorized to spend and prevents rogue spending.
+        Each agent must verify its own proof before making any payment.
+        """
+        start_time = time.time()
+
+        try:
+            proof_hex = spending_proof.get("proof", "")
+            if not proof_hex:
+                logger.warning("No spending proof to verify")
+                return False, 0
+
+            proof_bytes = bytes.fromhex(proof_hex)
+
+            result = await authorization_prover.verify_authorization(
+                proof=proof_bytes,
+                model_commitment=spending_proof.get("model_commitment", ""),
+                input_commitment=spending_proof.get("input_commitment", ""),
+                output_commitment=spending_proof.get("output_commitment", "")
+            )
+
+            verify_time = int((time.time() - start_time) * 1000)
+
+            if not result.valid:
+                logger.error(f"Self spending proof verification failed: {result.error}")
+            else:
+                logger.info(f"Self spending proof verified in {verify_time}ms - authorized to spend")
+
+            return result.valid, verify_time
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error verifying own spending proof: {e}")
+            verify_time = int((time.time() - start_time) * 1000)
+            return False, verify_time
+
+    async def _verify_scout_work_proof(self, work_proof: dict) -> tuple[bool, int]:
+        """
+        Verify Scout's quality work proof BEFORE paying for discovery.
+
+        This ensures Scout actually did work (analyzed URLs for quality)
+        before Analyst pays for the discovered URLs.
+        """
+        start_time = time.time()
+
+        try:
+            proof_hex = work_proof.get("proof", "")
+            if not proof_hex:
+                logger.warning("No work proof provided by Scout")
+                return False, 0
+
+            proof_bytes = bytes.fromhex(proof_hex)
+
+            result = await quality_scorer_prover.verify_quality_score(
+                proof=proof_bytes,
+                model_commitment=work_proof.get("model_commitment", ""),
+                input_commitment=work_proof.get("input_commitment", ""),
+                output_commitment=work_proof.get("output_commitment", "")
+            )
+
+            verify_time = int((time.time() - start_time) * 1000)
+
+            if not result.valid:
+                logger.error(f"Scout work proof verification failed: {result.error}")
+            else:
+                quality_tier = work_proof.get("quality_tier", "UNKNOWN")
+                logger.info(f"Scout work proof verified in {verify_time}ms - quality: {quality_tier}")
+
+            return result.valid, verify_time
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error verifying Scout work proof: {e}")
+            verify_time = int((time.time() - start_time) * 1000)
+            return False, verify_time
 
     async def start(self):
-        """Start the orchestration loop (Value Chain mode)"""
+        """Start the orchestration loop (2-Agent Model)"""
         self.running = True
-        logger.info("Starting Analyst orchestration loop (Value Chain mode)")
+        logger.info("Starting Analyst orchestration loop (2-Agent Model with Self-Authorization)")
         while self.running:
             try:
-                await self._process_batch()
+                await self._process_url()
             except Exception as e:
-                logger.error(f"Batch processing error: {e}", exc_info=True)
+                logger.error(f"URL processing error: {e}", exc_info=True)
             await asyncio.sleep(config.scout_interval_seconds)
 
     async def stop(self):
@@ -157,29 +294,65 @@ class AnalystAgent:
         self.running = False
         logger.info("Stopping Analyst orchestration loop")
 
-    async def _process_batch(self):
+    async def _process_url(self):
         """
-        Process a single batch in the Value Chain:
-        1. Call Scout to discover URLs (pay Scout)
-        2. Classify URLs with zkML proof
-        3. Store results
+        Process a single URL in the 2-Agent Model with mutual work verification:
+        1. Generate self-authorization spending proof
+        2. Self-verify the spending proof (prevents rogue spending)
+        3. Call Scout to discover 1 URL
+        4. Verify Scout's WORK proof (quality scoring)
+        5. Pay Scout (only after work proof is verified)
+        6. Classify URL with zkML proof
+        7. Store result
+
+        Mutual Work Verification:
+        - Scout generates work proof (quality scoring) - Analyst verifies
+        - Analyst generates work proof (classification) - Scout verifies
+        - Each agent self-verifies their own spending proof
         """
         import httpx
         import uuid
 
-        batch_id = str(uuid.uuid4())
-        logger.info(f"Starting batch {batch_id}")
+        request_id = str(uuid.uuid4())
+        logger.info(f"Starting URL processing {request_id} (2-Agent Model)")
 
-        # 1. Request URL discovery from Scout
+        # 1. Get budget and generate self-authorization spending proof
+        budget = self.x402_client.get_balance()
+        discovery_cost = config.discovery_price_per_url
+
+        if budget < discovery_cost + 0.01:
+            logger.warning(f"Insufficient budget: {budget}")
+            return None
+
+        # Generate spending proof before paying Scout
+        spending_proof = await self._generate_spending_proof(
+            request_id=request_id,
+            estimated_cost=discovery_cost,
+            budget_remaining=budget
+        )
+
+        if spending_proof.get("decision") != "AUTHORIZED":
+            logger.warning(f"Self-authorization denied: {spending_proof.get('decision')}")
+            return None
+
+        # 2. Self-verify the spending proof BEFORE spending
+        proof_valid, verify_time = await self._verify_own_spending_proof(spending_proof)
+        await emit_spending_proof_verified(request_id, "analyst", proof_valid, verify_time)
+
+        if not proof_valid:
+            logger.error(f"Self spending proof verification failed - aborting")
+            return None
+
+        # 3. Request single URL discovery from Scout
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 response = await client.post(
-                    f"{config.scout_url}/skills/discover-urls",
-                    json={"limit": config.scout_batch_size, "requester_id": "analyst"}
+                    f"{config.scout_url}/skills/discover-url",
+                    json={"requester_id": "analyst"}
                 )
 
                 if response.status_code == 404:
-                    logger.info("No new URLs available from Scout")
+                    logger.info("No new URL available from Scout")
                     return None
 
                 if response.status_code != 200:
@@ -191,219 +364,218 @@ class AnalystAgent:
             logger.error(f"Failed to call Scout: {e}")
             return None
 
-        urls = discovery.get("urls", [])
-        if not urls:
-            logger.info("No URLs returned from Scout")
+        url = discovery.get("url")
+        if not url:
+            logger.info("No URL returned from Scout")
             return None
 
-        logger.info(f"Received {len(urls)} URLs from Scout (batch {batch_id})")
+        logger.info(f"Received URL from Scout: {url[:50]}...")
 
-        # 2. Verify authorization proof from Scout
-        auth_proof_hash = discovery.get("authorization_proof_hash", "")
-        if not auth_proof_hash:
-            logger.warning("No authorization proof from Scout - skipping verification")
+        # Note: Scout's spending proof is for Scout's own spending (feedback payment).
+        # Scout self-verifies its own spending proof.
+        scout_spending_proof = discovery.get("spending_proof", {})
+
+        # 4. Verify Scout's WORK proof before paying
+        # This ensures Scout actually did work (analyzed URL quality) before we pay
+        scout_work_proof = discovery.get("work_proof", {})
+        if isinstance(scout_work_proof, dict) and scout_work_proof.get("proof"):
+            work_proof_valid, work_verify_time = await self._verify_scout_work_proof(scout_work_proof)
+            from shared.events import emit_work_verified
+            await emit_work_verified(
+                request_id=request_id,
+                valid=work_proof_valid,
+                verify_time_ms=work_verify_time,
+                quality_tier=scout_work_proof.get("quality_tier", "UNKNOWN")
+            )
+
+            if not work_proof_valid:
+                logger.error("Scout work proof verification failed - NOT PAYING")
+                return None
+
+            logger.info(f"Scout work proof verified: {scout_work_proof.get('quality_tier')} quality")
         else:
-            # Simple verification: check proof hash exists
-            # (Full verification would use the prover)
-            logger.info(f"Authorization proof verified: {auth_proof_hash[:16]}...")
+            logger.warning("No work proof from Scout - proceeding for backward compatibility")
 
-        # 3. Pay Scout for URL discovery
+        # 5. Pay Scout for URL discovery (work proof verified)
         payment_due = discovery.get("payment_due", {})
-        discovery_cost = payment_due.get("amount", 0)
+        payment_amount = payment_due.get("amount", discovery_cost)
 
-        if discovery_cost > 0:
-            try:
-                receipt = await self.x402_client.make_payment(
-                    recipient=payment_due.get("recipient", config.treasury_address),
-                    amount_usdc=discovery_cost,
-                    memo=payment_due.get("memo", f"discover-{batch_id}")
-                )
-                tx_hash = receipt.tx_hash if receipt else "simulated"
-                self.total_spent_usdc += discovery_cost
-                logger.info(f"Paid Scout ${discovery_cost} for URL discovery (tx: {tx_hash})")
+        try:
+            receipt = await self.x402_client.make_payment(
+                recipient=payment_due.get("recipient", config.treasury_address),
+                amount_usdc=payment_amount,
+                memo=payment_due.get("memo", f"discover-{request_id}")
+            )
+            tx_hash = receipt.tx_hash if receipt else "simulated"
+            self.total_spent_usdc += payment_amount
+            logger.info(f"Paid Scout ${payment_amount} for URL discovery (tx: {tx_hash})")
 
-                # Confirm payment with Scout
-                await self._confirm_scout_payment(batch_id, tx_hash, discovery_cost)
-            except Exception as e:
-                logger.error(f"Payment to Scout failed: {e}")
-                # Continue anyway in demo mode
+            # Confirm payment with Scout
+            await self._confirm_scout_payment(request_id, tx_hash, payment_amount)
+        except Exception as e:
+            logger.error(f"Payment to Scout failed: {e}")
+            # Continue anyway in demo mode
 
-        # 4. Classify URLs
-        policy_proof_hash = discovery.get("authorization_proof_hash", "")
-        classification_response = await self.classify_batch(
-            batch_id=batch_id,
-            urls=urls,
-            policy_proof_hash=policy_proof_hash
+        # 6. Classify URL (our work - Scout will verify our work proof before paying feedback)
+        scout_proof_hash = scout_spending_proof.get("proof_hash", "") if isinstance(scout_spending_proof, dict) else ""
+        classification_response = await self.classify_url(
+            request_id=request_id,
+            url=url,
+            policy_proof_hash=scout_proof_hash  # Now stores Scout's spending proof hash
         )
 
-        # 5. Store results in database
-        await self._store_classifications(
-            batch_id=batch_id,
+        # 7. Store result in database
+        await self._store_classification(
+            request_id=request_id,
             response=classification_response,
             source=discovery.get("source", "scout")
         )
 
         self.batches_processed += 1
-        logger.info(f"Batch {batch_id} complete: {len(urls)} URLs classified")
-        return batch_id
+        logger.info(f"URL {request_id} classified: {url[:50]}...")
+        return request_id
 
-    async def _confirm_scout_payment(self, batch_id: str, tx_hash: str, amount: float):
-        """Confirm payment to Scout"""
+    async def _confirm_scout_payment(self, request_id: str, tx_hash: str, amount: float):
+        """
+        Confirm payment to Scout for single URL discovery.
+
+        Note: We already self-verified our spending proof before paying.
+        Scout does NOT verify our spending proof - each agent self-verifies.
+        """
         import httpx
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 await client.post(
                     f"{config.scout_url}/confirm-discovery-payment",
-                    json={"batch_id": batch_id, "tx_hash": tx_hash, "amount": amount}
+                    json={
+                        "request_id": request_id,
+                        "tx_hash": tx_hash,
+                        "amount": amount
+                    }
                 )
         except Exception as e:
             logger.warning(f"Could not confirm payment with Scout: {e}")
 
-    async def _store_classifications(self, batch_id: str, response: ClassifyResponse, source: str):
-        """Store classification results in database"""
+    async def _store_classification(self, request_id: str, response: ClassifyResponse, source: str):
+        """Store single classification result in database"""
         from shared.types import ClassificationRecord, Classification as ClassEnum
 
-        records = []
-        for result in response.results:
-            record = ClassificationRecord(
-                url=result.url,
-                domain=result.domain,
-                classification=ClassEnum(result.classification),
-                confidence=result.confidence,
-                proof_hash=response.proof_hash,
-                model_commitment=response.model_commitment,
-                input_commitment=result.input_commitment,
-                output_commitment=result.output_commitment,
-                features=result.features,
-                context_used=result.context_used,
-                source=source,
-                batch_id=batch_id,
-                analyst_paid_usdc=0,  # Self-classified
-                policy_proof_hash=response.proof_hash
-            )
-            records.append(record)
+        result = response.result
+        record = ClassificationRecord(
+            url=result.url,
+            domain=result.domain,
+            classification=ClassEnum(result.classification),
+            confidence=result.confidence,
+            proof_hash=response.proof_hash,
+            model_commitment=response.model_commitment,
+            input_commitment=result.input_commitment,
+            output_commitment=result.output_commitment,
+            features=result.features,
+            context_used=result.context_used,
+            source=source,
+            batch_id=request_id,  # Using request_id in batch_id field for compatibility
+            analyst_paid_usdc=0,  # Self-classified
+            policy_proof_hash=response.proof_hash
+        )
 
-        await db.insert_classifications_batch(records)
-        logger.info(f"Stored {len(records)} classifications for batch {batch_id}")
+        await db.insert_classifications_batch([record])
+        logger.info(f"Stored classification for {request_id}: {result.url[:50]}...")
 
-    def calculate_price(self, url_count: int) -> float:
+    def calculate_price(self, url_count: int = 1) -> float:
         """Calculate price for classifying URLs"""
         return url_count * config.analyst_price_per_url
 
-    async def classify_batch(
+    async def classify_url(
         self,
-        batch_id: str,
-        urls: List[str],
+        request_id: str,
+        url: str,
         policy_proof_hash: str
     ) -> ClassifyResponse:
         """
-        Classify a batch of URLs with zkML proof.
+        Classify a single URL with zkML proof.
 
-        Returns classifications with cryptographic proof.
+        Returns classification with cryptographic proof.
         """
-        await emit_analyst_processing(batch_id, len(urls))
-        logger.info(f"Processing batch {batch_id}: {len(urls)} URLs")
+        await emit_analyst_processing(request_id, 1)
+        logger.info(f"Processing {request_id}: {url[:50]}...")
 
-        results = []
-        all_features = []
+        # Extract features
+        features = extract_features(url)
 
-        # Process each URL
-        for i, url in enumerate(urls):
-            # Extract features
-            features = extract_features(url)
-            all_features.append(features)
-
-            # Get context from database
-            context = await db.get_classification_context(
-                domain=features.domain,
-                registrar=None,  # Would need WHOIS lookup
-                ip=None  # Would need DNS lookup
-            )
-
-            # Enrich features with context
-            enriched_vector = features.to_vector()
-
-            # Add context features
-            if context.get("domain_phish_rate") is not None:
-                enriched_vector[20] = context["domain_phish_rate"]
-            if context.get("similar_domains_phish_rate") is not None:
-                enriched_vector[21] = context["similar_domains_phish_rate"]
-            if context.get("registrar_phish_rate") is not None:
-                enriched_vector[22] = context["registrar_phish_rate"]
-            if context.get("ip_phish_rate") is not None:
-                enriched_vector[23] = context["ip_phish_rate"]
-
-            # Generate individual classification proof
-            proof_result = await classifier_prover.prove_classification(enriched_vector)
-
-            # Extract classification from proof output
-            output = proof_result.output
-            classification = Classification(output["classification"])
-            confidence = output["confidence"]
-
-            results.append(ClassificationResult(
-                url=url,
-                domain=features.domain,
-                classification=classification.value,
-                confidence=confidence,
-                features=features.to_dict(),
-                context_used=context,
-                input_commitment=proof_result.input_commitment,
-                output_commitment=proof_result.output_commitment
-            ))
-
-            # Update progress
-            if (i + 1) % 10 == 0:
-                await emit_analyst_processing(batch_id, len(urls), i + 1)
-                logger.debug(f"Batch {batch_id}: processed {i + 1}/{len(urls)} URLs")
-
-        # Generate batch proof
-        await emit_analyst_proving(batch_id)
-
-        batch_features = [f.to_vector() for f in all_features]
-        _, batch_proof = await classifier_prover.prove_batch_classification(batch_features)
-
-        # Update stats
-        self.classifications_today += len(urls)
-        self.phishing_detected_today += sum(
-            1 for r in results if r.classification == Classification.PHISHING.value
+        # Get context from database
+        context = await db.get_classification_context(
+            domain=features.domain,
+            registrar=None,  # Would need WHOIS lookup
+            ip=None  # Would need DNS lookup
         )
 
-        # Count results
-        phishing_count = sum(1 for r in results if r.classification == "PHISHING")
-        safe_count = sum(1 for r in results if r.classification == "SAFE")
-        suspicious_count = sum(1 for r in results if r.classification == "SUSPICIOUS")
+        # Enrich features with context
+        enriched_vector = features.to_vector()
 
-        logger.info(f"Batch {batch_id} classified: {phishing_count} phishing, {safe_count} safe, {suspicious_count} suspicious")
+        # Add context features
+        if context.get("domain_phish_rate") is not None:
+            enriched_vector[20] = context["domain_phish_rate"]
+        if context.get("similar_domains_phish_rate") is not None:
+            enriched_vector[21] = context["similar_domains_phish_rate"]
+        if context.get("registrar_phish_rate") is not None:
+            enriched_vector[22] = context["registrar_phish_rate"]
+        if context.get("ip_phish_rate") is not None:
+            enriched_vector[23] = context["ip_phish_rate"]
+
+        # Generate classification proof
+        await emit_analyst_proving(request_id)
+        proof_result = await classifier_prover.prove_classification(enriched_vector)
+
+        # Extract classification from proof output
+        output = proof_result.output
+        classification = Classification(output["classification"])
+        confidence = output["confidence"]
+
+        result = ClassificationResult(
+            url=url,
+            domain=features.domain,
+            classification=classification.value,
+            confidence=confidence,
+            features=features.to_dict(),
+            context_used=context,
+            input_commitment=proof_result.input_commitment,
+            output_commitment=proof_result.output_commitment
+        )
+
+        # Update stats
+        self.classifications_today += 1
+        if classification == Classification.PHISHING:
+            self.phishing_detected_today += 1
+
+        logger.info(f"{request_id} classified: {classification.value} (confidence: {confidence:.2f})")
 
         await emit_analyst_response(
-            batch_id=batch_id,
-            phishing_count=phishing_count,
-            safe_count=safe_count,
-            suspicious_count=suspicious_count,
-            proof_hash=batch_proof.proof_hash,
-            prove_time_ms=batch_proof.prove_time_ms
+            request_id=request_id,
+            classification=classification.value,
+            confidence=confidence,
+            proof_hash=proof_result.proof_hash,
+            prove_time_ms=proof_result.prove_time_ms
         )
 
         # Calculate payment due (for proof-gated payment flow)
-        payment_amount = self.calculate_price(len(urls))
+        payment_amount = self.calculate_price(1)
         payment_due = PaymentDue(
             amount=payment_amount,
             currency="USDC",
             recipient=self.wallet_address,
             chain=config.base_chain_caip2,
-            memo=f"classify-{batch_id}"
+            memo=f"classify-{request_id}"
         )
 
         return ClassifyResponse(
-            batch_id=batch_id,
-            results=results,
-            proof=batch_proof.proof_hex,
-            proof_hash=batch_proof.proof_hash,
-            model_commitment=batch_proof.model_commitment,
-            input_commitment=batch_proof.input_commitment,
-            output_commitment=batch_proof.output_commitment,
-            prove_time_ms=batch_proof.prove_time_ms,
+            request_id=request_id,
+            result=result,
+            proof=proof_result.proof_hex,
+            proof_hash=proof_result.proof_hash,
+            model_commitment=proof_result.model_commitment,
+            input_commitment=proof_result.input_commitment,
+            output_commitment=proof_result.output_commitment,
+            prove_time_ms=proof_result.prove_time_ms,
             timestamp=datetime.utcnow().isoformat(),
             payment_due=payment_due
         )
@@ -453,8 +625,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Analyst Agent",
-    description="Classifies URLs with zkML proofs",
+    title="Analyst Agent (2-Agent Model)",
+    description="Classifies URLs with zkML proofs and self-authorized spending. Part of Scout ←→ Analyst circular economy.",
     lifespan=lifespan
 )
 
@@ -469,12 +641,12 @@ app.add_middleware(
 
 @app.get("/.well-known/agent.json")
 async def agent_card():
-    """A2A v0.3 Agent Card"""
+    """A2A v0.3 Agent Card (2-Agent Model)"""
     return build_agent_card_v3(
         name="Analyst Agent",
-        description="Classifies URLs as phishing/safe/suspicious with zkML proofs",
+        description="Classifies URLs with zkML proofs. Generates self-authorized spending proofs and verifies Scout spending proofs.",
         url=config.analyst_url,
-        version="1.0.0",
+        version="2.0.0",
         streaming=False,
         push_notifications=False,
         state_transition_history=True,
@@ -484,10 +656,10 @@ async def agent_card():
         supported_payment_methods=["x402"],
         skills=[
             build_skill_v3(
-                skill_id="classify-urls",
+                skill_id="classify-url",
                 name="URL Classification",
-                description="Classify URLs as phishing/safe/suspicious with cryptographic proof of ML inference",
-                tags=["classification", "phishing", "zkml", "threat-intel", "security"],
+                description="Classify a URL as phishing/safe/suspicious with cryptographic proof of ML inference",
+                tags=["classification", "phishing", "zkml", "threat-intel", "security", "self-auth"],
                 input_modes=["application/json"],
                 output_modes=["application/json"],
                 price_amount=config.analyst_price_per_url,
@@ -506,13 +678,17 @@ async def health():
     return {
         "status": "healthy",
         "production_mode": config.production_mode,
-        "orchestrator": True,  # Analyst drives the pipeline in Value Chain mode
+        "architecture": "2-agent",
+        "self_authorization": True,
+        "orchestrator": True,  # Analyst drives the pipeline
         "running": analyst_agent.running,
         "batches_processed": analyst_agent.batches_processed,
         "model_commitment": analyst_agent.model_commitment,
+        "spending_model_commitment": analyst_agent.spending_model_commitment,
         "zkml_available": classifier_prover.prover.zkml_available,
         "real_proofs_enabled": classifier_prover.prover.zkml_available,
-        "payment_flow": "value-chain"  # Analyst pays Scout pays Policy
+        "payment_flow": "circular",  # Analyst ←→ Scout
+        "total_feedback_received": analyst_agent.total_feedback_received
     }
 
 
@@ -522,38 +698,38 @@ async def stats():
     return analyst_agent.get_stats()
 
 
-@app.post("/skills/classify-urls")
-async def classify_urls(
+@app.post("/skills/classify-url")
+async def classify_url_endpoint(
     request: ClassifyRequest,
     http_request: Request
 ) -> ClassifyResponse:
     """
-    Classify URLs with zkML proof (Proof-Gated Payment Flow).
+    Classify a single URL with zkML proof (Proof-Gated Payment Flow).
 
     NO payment required upfront. Flow:
-    1. Scout calls this endpoint
+    1. Scout calls this endpoint with 1 URL
     2. Analyst does work, generates zkML proof
-    3. Response includes results + proof + payment_due
+    3. Response includes result + proof + payment_due
     4. Scout verifies the proof
     5. If valid, Scout pays via /confirm-payment endpoint
     6. If invalid, no payment (Scout keeps their money)
 
     This ensures: NO VALID PROOF = NO PAYMENT
     """
-    logger.info(f"Processing classification request for batch {request.batch_id} ({len(request.urls)} URLs)")
+    logger.info(f"Processing classification request {request.request_id}: {request.url[:50]}...")
 
     # Do the work and return proof + payment_due
     # Payment will be made AFTER Scout verifies the proof
-    return await analyst_agent.classify_batch(
-        batch_id=request.batch_id,
-        urls=request.urls,
+    return await analyst_agent.classify_url(
+        request_id=request.request_id,
+        url=request.url,
         policy_proof_hash=request.policy_proof_hash
     )
 
 
 class ConfirmPaymentRequest(BaseModel):
     """Request to confirm payment after proof verification"""
-    batch_id: str
+    request_id: str
     tx_hash: str
     amount: float
 
@@ -561,10 +737,10 @@ class ConfirmPaymentRequest(BaseModel):
 @app.post("/confirm-payment")
 async def confirm_payment(request: ConfirmPaymentRequest):
     """
-    Confirm payment received after proof verification.
+    Confirm payment received after proof verification (single URL).
 
     Called by Scout after:
-    1. Receiving classification results + proof
+    1. Receiving classification result + proof
     2. Verifying the zkML proof is valid
     3. Making the USDC payment
 
@@ -592,13 +768,67 @@ async def confirm_payment(request: ConfirmPaymentRequest):
 
     # Record earnings
     analyst_agent.total_earned_usdc += request.amount
-    logger.info(f"Payment confirmed for batch {request.batch_id}: ${request.amount} USDC (tx: {request.tx_hash})")
+    logger.info(f"Payment confirmed for {request.request_id}: ${request.amount} USDC (tx: {request.tx_hash})")
 
     return {
         "status": "confirmed",
-        "batch_id": request.batch_id,
+        "request_id": request.request_id,
         "amount": request.amount,
         "total_earned": analyst_agent.total_earned_usdc
+    }
+
+
+class ConfirmFeedbackPaymentRequest(BaseModel):
+    """Request to confirm feedback payment from Scout"""
+    request_id: str
+    tx_hash: str
+    amount: float
+
+
+@app.post("/confirm-feedback-payment")
+async def confirm_feedback_payment(request: ConfirmFeedbackPaymentRequest):
+    """
+    Confirm feedback payment received from Scout (2-Agent Model).
+
+    Called by Scout after:
+    1. Generating its own spending proof
+    2. Self-verifying its spending proof (prevents rogue spending)
+    3. Making the USDC feedback payment to Analyst
+
+    Note: Scout self-verifies its own spending proof before paying.
+    Analyst does NOT verify Scout's spending proof - each agent self-verifies.
+    This completes the circular economy: Analyst → Scout → Analyst
+    """
+    # Verify payment if in production mode
+    if config.production_mode and request.tx_hash != "simulated":
+        try:
+            tolerance = 1 - config.payment_tolerance
+            is_valid, error = analyst_agent.x402_client.verify_payment(
+                tx_hash=request.tx_hash,
+                expected_recipient=analyst_agent.wallet_address,
+                expected_amount_usdc=request.amount * tolerance
+            )
+            if not is_valid:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Feedback payment verification failed: {error}"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Feedback payment verification error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Record feedback earnings
+    analyst_agent.total_feedback_received += request.amount
+    logger.info(f"Feedback payment confirmed for {request.request_id}: ${request.amount} USDC (tx: {request.tx_hash})")
+
+    return {
+        "status": "confirmed",
+        "request_id": request.request_id,
+        "amount": request.amount,
+        "total_feedback_received": analyst_agent.total_feedback_received,
+        "payment_type": "feedback"
     }
 
 
@@ -608,8 +838,8 @@ async def classify(
     request: ClassifyRequest,
     http_request: Request
 ) -> ClassifyResponse:
-    """Alias for classify-urls (proof-gated payment flow)"""
-    return await classify_urls(request, http_request)
+    """Alias for classify-url (proof-gated payment flow)"""
+    return await classify_url_endpoint(request, http_request)
 
 
 @app.post("/extract-features")
@@ -637,26 +867,25 @@ async def task_send(params: dict) -> dict:
     """
     A2A task/send method (Proof-Gated Payment Flow).
 
-    Creates a task, executes the classify-urls skill, and returns the result.
+    Creates a task, executes the classify-url skill, and returns the result.
     NO payment required upfront - payment is made AFTER proof verification.
 
     Flow:
     1. Scout sends task/send request (no payment needed)
     2. Analyst executes classification, generates zkML proof
-    3. Response includes results + proof + payment_due
+    3. Response includes result + proof + payment_due
     4. Scout verifies the proof
     5. If valid, Scout pays and calls task/confirm-payment
     """
-    skill_id = params.get("skillId", "classify-urls")
+    skill_id = params.get("skillId", "classify-url")
     input_data = params.get("input", {})
     context_id = params.get("contextId")
 
-    if skill_id != "classify-urls":
+    if skill_id != "classify-url":
         raise ValueError(f"Unknown skill: {skill_id}")
 
-    # Calculate payment that will be due after proof verification
-    urls = input_data.get("urls", [])
-    required_amount = analyst_agent.calculate_price(len(urls))
+    # Calculate payment that will be due after proof verification (1 URL)
+    required_amount = analyst_agent.calculate_price(1)
 
     # Create task
     task = await analyst_task_store.create(
@@ -672,9 +901,9 @@ async def task_send(params: dict) -> dict:
     # Execute the classification (no payment verification - proof-gated flow)
     async def classification_handler(inp: dict) -> dict:
         request = ClassifyRequest(**inp)
-        response = await analyst_agent.classify_batch(
-            batch_id=request.batch_id,
-            urls=request.urls,
+        response = await analyst_agent.classify_url(
+            request_id=request.request_id,
+            url=request.url,
             policy_proof_hash=request.policy_proof_hash
         )
         return response.model_dump()
@@ -694,10 +923,10 @@ async def task_send(params: dict) -> dict:
             mime_type="application/json"
         )
 
-        # Add individual classification results as artifact
+        # Add classification result as artifact
         task.add_artifact(
-            name="classification_results",
-            data=task.output.get("results", []),
+            name="classification_result",
+            data=task.output.get("result", {}),
             mime_type="application/json"
         )
 

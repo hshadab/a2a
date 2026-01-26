@@ -82,13 +82,17 @@ export function getEventIcon(type: string, data?: Record<string, any>): string {
   switch (type) {
     case 'SCOUT_FOUND_URLS':
       return '→';
-    case 'POLICY_REQUESTING':
+    case 'SCOUT_AUTHORIZING':
       return '○';
-    case 'POLICY_PROVING':
-      return '◐';
-    case 'POLICY_RESPONSE':
+    case 'SCOUT_AUTHORIZED':
       return '●';
-    case 'POLICY_VERIFIED':
+    case 'SCOUT_PROVING':
+      return '◐';
+    case 'ANALYST_AUTHORIZING':
+      return '○';
+    case 'ANALYST_AUTHORIZED':
+      return '●';
+    case 'SPENDING_PROOF_VERIFIED':
       return data?.valid === false ? '✗' : '✓';
     case 'PAYMENT_SENDING':
       return '$';
@@ -115,18 +119,22 @@ export function getEventColor(type: string, data?: Record<string, any>): string 
   switch (type) {
     case 'SCOUT_FOUND_URLS':
       return 'text-blue-400';
-    case 'POLICY_REQUESTING':
-    case 'POLICY_PROVING':
-      return 'text-purple-400';
-    case 'POLICY_RESPONSE':
+    case 'SCOUT_AUTHORIZING':
+    case 'SCOUT_PROVING':
+      return 'text-blue-400';
+    case 'SCOUT_AUTHORIZED':
       return 'text-green-400';
-    case 'POLICY_VERIFIED':
+    case 'ANALYST_AUTHORIZING':
+    case 'ANALYST_PROVING':
+      return 'text-cyan-400';
+    case 'ANALYST_AUTHORIZED':
+      return 'text-green-400';
+    case 'SPENDING_PROOF_VERIFIED':
       return data?.valid === false ? 'text-red-400' : 'text-green-400';
     case 'PAYMENT_SENDING':
     case 'PAYMENT_SENT':
       return 'text-yellow-400';
     case 'ANALYST_PROCESSING':
-    case 'ANALYST_PROVING':
       return 'text-cyan-400';
     case 'ANALYST_RESPONSE':
       return 'text-green-400';

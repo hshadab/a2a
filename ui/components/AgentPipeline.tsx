@@ -7,11 +7,10 @@ import VerificationChecklist from './VerificationChecklist';
 
 type AgentState = 'idle' | 'active' | 'working' | 'proving';
 
-// Agent wallet addresses
+// Agent wallet addresses (2-Agent Model: Scout + Analyst)
 const WALLET_ADDRESSES = {
   analyst: '0x7ee88871fA9be48b62552F231a4976A11e559db8',
   scout: '0x269CBA662fE55c4fe1212c609090A31844C36ab8',
-  policy: '0x58e12462395F9056a60bf4Db4E540C4984dA27be',
 };
 
 interface ProofStage {
@@ -62,7 +61,7 @@ interface AgentPipelineProps {
 
 export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelineProps) {
   const [particles, setParticles] = useState<{ id: number; from: string; to: string }[]>([]);
-  const [proofProgress, setProofProgress] = useState<{ policy: number; analyst: number }>({ policy: 0, analyst: 0 });
+  const [proofProgress, setProofProgress] = useState<{ scout: number; analyst: number }>({ scout: 0, analyst: 0 });
   const [walletBalances, setWalletBalances] = useState<Record<string, { usdc: number; eth: number }>>({});
 
   // Fetch wallet balances
@@ -116,54 +115,70 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     return () => clearInterval(interval);
   }, []);
 
-  // Track proof state for each agent
-  const [policyProof, setPolicyProof] = useState<ProofData | null>(null);
+  // Track proof state for each agent (2-Agent Model)
+  const [scoutSpendingProof, setScoutSpendingProof] = useState<ProofData | null>(null);
+  const [analystSpendingProof, setAnalystSpendingProof] = useState<ProofData | null>(null);
   const [analystProof, setAnalystProof] = useState<ProofData | null>(null);
-  const [policyProofStage, setPolicyProofStage] = useState<ProofStage | null>(null);
+  const [scoutProofStage, setScoutProofStage] = useState<ProofStage | null>(null);
   const [analystProofStage, setAnalystProofStage] = useState<ProofStage | null>(null);
-  const [policyVerifyChecks, setPolicyVerifyChecks] = useState<VerificationCheck[]>([]);
+  const [spendingVerifyChecks, setSpendingVerifyChecks] = useState<VerificationCheck[]>([]);
   const [analystVerifyChecks, setAnalystVerifyChecks] = useState<VerificationCheck[]>([]);
 
   // Track current payment info for annotations
   const [currentPayment, setCurrentPayment] = useState<{ amount: number; recipient: string } | null>(null);
 
-  // Update proof state based on events
+  // Update proof state based on events (2-Agent Model)
   useEffect(() => {
     if (!lastEvent) return;
 
     switch (lastEvent.type) {
-      case 'POLICY_PROVING':
-        setPolicyProofStage({
-          name: lastEvent.data.stage || 'PROVING',
-          message: lastEvent.data.message || 'Generating zkML proof...',
-          progress_pct: lastEvent.data.progress_pct || 50,
+      // Scout self-authorization events
+      case 'SCOUT_AUTHORIZING':
+        setScoutProofStage({
+          name: 'AUTHORIZING',
+          message: 'Generating spending proof...',
+          progress_pct: 50,
         });
-        setProofProgress(prev => ({ ...prev, policy: lastEvent.data.progress_pct || 50 }));
+        setProofProgress(prev => ({ ...prev, scout: 50 }));
         break;
 
-      case 'POLICY_RESPONSE':
-        setPolicyProofStage(null);
-        setProofProgress(prev => ({ ...prev, policy: 100 }));
-        if (lastEvent.data.proof) {
-          setPolicyProof({
-            proof_hash: lastEvent.data.proof.proof_hash || '',
-            model_commitment: lastEvent.data.proof.model_commitment || '',
-            input_commitment: lastEvent.data.proof.input_commitment || '',
-            output_commitment: lastEvent.data.proof.output_commitment || '',
-            prove_time_ms: lastEvent.data.proof.prove_time_ms || 0,
-            proof_size_bytes: lastEvent.data.proof.proof_size_bytes || 0,
-            decision: lastEvent.data.decision,
-            confidence: lastEvent.data.confidence,
-            is_real_proof: lastEvent.data.proof.is_real_proof || false,
-            stages: lastEvent.data.proof.stages,
-          });
-        }
+      case 'SCOUT_AUTHORIZED':
+        setScoutProofStage(null);
+        setProofProgress(prev => ({ ...prev, scout: 100 }));
+        setScoutSpendingProof({
+          proof_hash: lastEvent.data.proof_hash || '',
+          model_commitment: '',
+          input_commitment: '',
+          output_commitment: '',
+          prove_time_ms: lastEvent.data.prove_time_ms || 0,
+          proof_size_bytes: 0,
+          decision: lastEvent.data.decision,
+          confidence: lastEvent.data.confidence,
+          is_real_proof: true,
+        });
         break;
 
-      case 'POLICY_VERIFIED':
-        if (lastEvent.data.checks) {
-          setPolicyVerifyChecks(lastEvent.data.checks);
-        }
+      // Analyst self-authorization events
+      case 'ANALYST_AUTHORIZING':
+        setAnalystProofStage({
+          name: 'AUTHORIZING',
+          message: 'Generating spending proof...',
+          progress_pct: 30,
+        });
+        break;
+
+      case 'ANALYST_AUTHORIZED':
+        setAnalystSpendingProof({
+          proof_hash: lastEvent.data.proof_hash || '',
+          model_commitment: '',
+          input_commitment: '',
+          output_commitment: '',
+          prove_time_ms: lastEvent.data.prove_time_ms || 0,
+          proof_size_bytes: 0,
+          decision: lastEvent.data.decision,
+          confidence: lastEvent.data.confidence,
+          is_real_proof: true,
+        });
         break;
 
       case 'ANALYST_PROVING':
@@ -194,6 +209,13 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         }
         break;
 
+      // Spending proof verification
+      case 'SPENDING_PROOF_VERIFIED':
+        if (lastEvent.data.checks) {
+          setSpendingVerifyChecks(lastEvent.data.checks);
+        }
+        break;
+
       case 'WORK_VERIFIED':
         if (lastEvent.data.checks) {
           setAnalystVerifyChecks(lastEvent.data.checks);
@@ -213,9 +235,9 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     }
   }, [lastEvent]);
 
-  // Derive agent states from last event
+  // Derive agent states from last event (2-Agent Model)
   const agentStates = useMemo(() => {
-    const states = { scout: 'idle' as AgentState, policy: 'idle' as AgentState, analyst: 'idle' as AgentState };
+    const states = { scout: 'idle' as AgentState, analyst: 'idle' as AgentState };
 
     if (!lastEvent) return states;
 
@@ -223,16 +245,17 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
       case 'SCOUT_FOUND_URLS':
         states.scout = 'working';
         break;
-      case 'POLICY_REQUESTING':
+      case 'SCOUT_AUTHORIZING':
+        states.scout = 'proving';
+        break;
+      case 'SCOUT_AUTHORIZED':
         states.scout = 'active';
-        states.policy = 'working';
         break;
-      case 'POLICY_PROVING':
-        states.policy = 'proving';
+      case 'ANALYST_AUTHORIZING':
+        states.analyst = 'proving';
         break;
-      case 'POLICY_RESPONSE':
-      case 'POLICY_VERIFIED':
-        states.policy = 'active';
+      case 'ANALYST_AUTHORIZED':
+        states.analyst = 'active';
         break;
       case 'ANALYST_PROCESSING':
         states.analyst = 'working';
@@ -242,6 +265,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         break;
       case 'ANALYST_RESPONSE':
       case 'WORK_VERIFIED':
+      case 'SPENDING_PROOF_VERIFIED':
         states.analyst = 'active';
         break;
       case 'DATABASE_UPDATED':
@@ -251,18 +275,33 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     return states;
   }, [lastEvent]);
 
-  // Determine active flow direction
+  // Determine active flow direction (2-Agent Model: Scout ←→ Analyst)
   const activeFlow = useMemo(() => {
     if (!lastEvent) return null;
 
-    if (lastEvent.type === 'POLICY_REQUESTING' || lastEvent.type === 'PAYMENT_SENDING') {
-      if (lastEvent.data.recipient?.includes('policy')) return 'scout-policy';
-      if (lastEvent.data.recipient?.includes('analyst')) return 'policy-analyst';
-      return 'scout-policy';
+    // Analyst → Scout: Analyst pays Scout for discovery
+    if (lastEvent.type === 'ANALYST_AUTHORIZING' ||
+        (lastEvent.type === 'PAYMENT_SENDING' && lastEvent.data.recipient?.includes('scout'))) {
+      return 'analyst-scout';
     }
-    if (lastEvent.type === 'POLICY_RESPONSE' || lastEvent.type === 'POLICY_VERIFIED') return 'policy-scout';
-    if (lastEvent.type === 'ANALYST_PROCESSING') return 'policy-analyst';
-    if (lastEvent.type === 'ANALYST_RESPONSE' || lastEvent.type === 'WORK_VERIFIED') return 'analyst-scout';
+
+    // Scout → Analyst: Scout returns URLs, Scout pays Analyst feedback
+    if (lastEvent.type === 'SCOUT_AUTHORIZING' ||
+        lastEvent.type === 'SCOUT_AUTHORIZED' ||
+        (lastEvent.type === 'PAYMENT_SENDING' && lastEvent.data.recipient?.includes('analyst'))) {
+      return 'scout-analyst';
+    }
+
+    if (lastEvent.type === 'ANALYST_PROCESSING' ||
+        lastEvent.type === 'ANALYST_PROVING' ||
+        lastEvent.type === 'SPENDING_PROOF_VERIFIED') {
+      return 'scout-analyst';
+    }
+
+    if (lastEvent.type === 'ANALYST_RESPONSE' || lastEvent.type === 'WORK_VERIFIED') {
+      return 'analyst-scout';
+    }
+
     return null;
   }, [lastEvent]);
 
@@ -278,12 +317,11 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     }
   }, [activeFlow, lastEvent?.timestamp]);
 
-  // Filter events by agent
+  // Filter events by agent (2-Agent Model)
   const getAgentEvents = (agent: string) => {
     const prefixes: Record<string, string[]> = {
       scout: ['SCOUT', 'DATABASE'],
-      policy: ['POLICY'],
-      analyst: ['ANALYST', 'WORK_VERIFIED'],
+      analyst: ['ANALYST', 'WORK_VERIFIED', 'SPENDING_PROOF_VERIFIED'],
     };
     return events
       .filter(e => prefixes[agent]?.some(p => e.type.startsWith(p)))
@@ -294,20 +332,22 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
     switch (event.type) {
       case 'SCOUT_FOUND_URLS':
         return `Found ${event.data.url_count} URLs`;
-      case 'POLICY_REQUESTING':
-        return `Reviewing ${event.data.url_count} URLs`;
-      case 'POLICY_PROVING':
-        return 'Generating zkML proof...';
-      case 'POLICY_RESPONSE':
+      case 'SCOUT_AUTHORIZING':
+        return 'Generating spending proof...';
+      case 'SCOUT_AUTHORIZED':
         return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}%)`;
-      case 'POLICY_VERIFIED':
-        return event.data.valid !== false ? 'Proof verified' : 'Proof FAILED';
+      case 'ANALYST_AUTHORIZING':
+        return 'Generating spending proof...';
+      case 'ANALYST_AUTHORIZED':
+        return `${event.data.decision} (${(event.data.confidence * 100).toFixed(0)}%)`;
       case 'ANALYST_PROCESSING':
         return `Classifying ${event.data.url_count} URLs`;
       case 'ANALYST_PROVING':
         return 'Generating zkML proof...';
       case 'ANALYST_RESPONSE':
         return `${event.data.phishing_count} phishing found`;
+      case 'SPENDING_PROOF_VERIFIED':
+        return event.data.valid !== false ? `${event.data.agent} proof verified` : `${event.data.agent} proof FAILED`;
       case 'WORK_VERIFIED':
         return event.data.valid !== false ? 'Work proof verified' : 'Work proof FAILED';
       case 'DATABASE_UPDATED':
@@ -319,8 +359,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
   return (
     <div className="w-full network-alive">
-      {/* Pipeline Container with SVG Connections */}
-      <div className="relative flex items-stretch justify-between gap-2">
+      {/* Pipeline Container with SVG Connections (2-Agent Model) */}
+      <div className="relative flex items-stretch justify-center gap-8">
         {/* SVG Layer for Connection Arrows */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
@@ -349,52 +389,28 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
             </filter>
           </defs>
 
-          {/* Connection: Analyst to Scout - Payment flow (Analyst pays Scout) */}
+          {/* Connection: Analyst to Scout - Payment flow (Analyst pays Scout for discovery) */}
           <line
-            x1="26" y1="42"
-            x2="40" y2="42"
+            x1="30" y1="42"
+            x2="70" y2="42"
             stroke={activeFlow === 'analyst-scout' ? '#fbbf24' : '#22d3ee'}
-            strokeWidth="0.4"
+            strokeWidth="0.5"
             strokeOpacity={activeFlow === 'analyst-scout' ? 1 : 0.6}
             markerEnd={activeFlow === 'analyst-scout' ? 'url(#arrowRightActive)' : 'url(#arrowRight)'}
             className={activeFlow === 'analyst-scout' ? '' : 'flow-line'}
             filter={activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
           />
-          {/* Scout to Analyst - Response with URLs */}
+          {/* Scout to Analyst - URLs + proof, Scout pays Analyst feedback */}
           <line
-            x1="40" y1="48"
-            x2="26" y2="48"
-            stroke={activeFlow === 'scout-analyst' ? '#22d3ee' : '#22d3ee'}
-            strokeWidth="0.4"
+            x1="70" y1="48"
+            x2="30" y2="48"
+            stroke={activeFlow === 'scout-analyst' ? '#fbbf24' : '#3b82f6'}
+            strokeWidth="0.5"
             strokeOpacity={activeFlow === 'scout-analyst' ? 1 : 0.4}
             markerEnd="url(#arrowLeft)"
             className={activeFlow === 'scout-analyst' ? '' : 'flow-line'}
             style={{ animationDirection: 'reverse' }}
             filter={activeFlow === 'scout-analyst' ? 'url(#glow)' : 'none'}
-          />
-
-          {/* Connection: Scout to Policy - Payment flow (Scout pays Policy) */}
-          <line
-            x1="60" y1="42"
-            x2="74" y2="42"
-            stroke={activeFlow === 'scout-policy' ? '#fbbf24' : '#3b82f6'}
-            strokeWidth="0.4"
-            strokeOpacity={activeFlow === 'scout-policy' ? 1 : 0.6}
-            markerEnd={activeFlow === 'scout-policy' ? 'url(#arrowRightActive)' : 'url(#arrowRight)'}
-            className={activeFlow === 'scout-policy' ? '' : 'flow-line'}
-            filter={activeFlow === 'scout-policy' ? 'url(#glow)' : 'none'}
-          />
-          {/* Policy to Scout - Authorization response */}
-          <line
-            x1="74" y1="48"
-            x2="60" y2="48"
-            stroke={activeFlow === 'policy-scout' ? '#22d3ee' : '#3b82f6'}
-            strokeWidth="0.4"
-            strokeOpacity={activeFlow === 'policy-scout' ? 1 : 0.4}
-            markerEnd="url(#arrowLeft)"
-            className={activeFlow === 'policy-scout' ? '' : 'flow-line'}
-            style={{ animationDirection: 'reverse', animationDelay: '0.5s' }}
-            filter={activeFlow === 'policy-scout' ? 'url(#glow)' : 'none'}
           />
 
         </svg>
@@ -411,40 +427,26 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           </div>
         )}
 
-        {/* Flow Label Annotations */}
+        {/* Flow Label Annotations (2-Agent Model) */}
         {activeFlow === 'analyst-scout' && (
-          <div className="absolute top-4 left-[30%] z-10">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
             <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
               $0.001 + Discovery Request
             </span>
           </div>
         )}
         {activeFlow === 'scout-analyst' && (
-          <div className="absolute top-4 left-[30%] z-10">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
             <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
-              URLs + Auth Proof
-            </span>
-          </div>
-        )}
-        {activeFlow === 'scout-policy' && (
-          <div className="absolute top-4 left-[65%] z-10">
-            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
-              $0.001 + Auth Request
-            </span>
-          </div>
-        )}
-        {activeFlow === 'policy-scout' && (
-          <div className="absolute top-4 left-[65%] z-10">
-            <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
-              Authorized + Proof
+              URLs + Spending Proof + $0.001 Feedback
             </span>
           </div>
         )}
 
-        {/* Analyst Agent - Pays Scout first in the value chain */}
+        {/* Analyst Agent - Pays Scout for discovery, receives feedback payment */}
         <AgentCard
           name="Threat Analysis Agent"
-          role="Proof of Correct Analysis"
+          role="Self-Auth Spending + Classification"
           icon={<Microscope size={24} />}
           color="cyan"
           colorHex="#22d3ee"
@@ -461,17 +463,17 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         />
 
         {/* Spacer for SVG lines */}
-        <div className="w-16" />
+        <div className="w-32" />
 
-        {/* Scout Agent - Receives from Analyst, pays Policy */}
+        {/* Scout Agent - Self-authorizes, receives from Analyst, pays Analyst feedback */}
         <AgentCard
           name="Scout Agent"
-          role="Potential Threat Discovery"
+          role="Self-Auth Spending + Discovery"
           icon={<Search size={24} />}
           color="blue"
           colorHex="#3b82f6"
           state={agentStates.scout}
-          proofProgress={0}
+          proofProgress={agentStates.scout === 'proving' ? proofProgress.scout : 0}
           stats={[
             { label: 'URLs Found', value: stats?.total_urls?.toLocaleString() || '0' },
             { label: 'Sources', value: '4' },
@@ -481,46 +483,24 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           walletBalance={walletBalances.scout}
           walletAddress={WALLET_ADDRESSES.scout}
         />
-
-        {/* Spacer for SVG lines */}
-        <div className="w-16" />
-
-        {/* Policy Agent - Receives from Scout, pays Analyst (completes circle) */}
-        <AgentCard
-          name="Spending Approval Agent"
-          role="Proof of Correct Approval"
-          icon={<Scale size={24} />}
-          color="purple"
-          colorHex="#a855f7"
-          state={agentStates.policy}
-          proofProgress={agentStates.policy === 'proving' ? proofProgress.policy : 0}
-          stats={[
-            { label: 'Proofs', value: stats?.total_proofs?.toLocaleString() || '0' },
-            { label: 'Earned', value: `$${(stats?.policy_paid_usdc || 0).toFixed(3)}` },
-          ]}
-          events={getAgentEvents('policy')}
-          formatEvent={formatEventMessage}
-          walletBalance={walletBalances.policy}
-          walletAddress={WALLET_ADDRESSES.policy}
-        />
       </div>
 
-      {/* Flow Legend */}
+      {/* Flow Legend (2-Agent Model) */}
       <div className="flex justify-center gap-6 mt-6 text-xs text-gray-500">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_8px_#fbbf24] status-active" />
-          <span>Request/Data</span>
+          <span>Discovery Request</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee] status-active" style={{ animationDelay: '0.3s' }} />
-          <span>Response/Proof</span>
+          <span>URLs + Spending Proof</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-green-400 shadow-[0_0_8px_#22c55e] status-active" style={{ animationDelay: '0.6s' }} />
-          <span>Payment</span>
+          <span>$0.001 Payments</span>
         </div>
         <div className="flex items-center gap-2 ml-4 border-l border-gray-700 pl-4">
-          <span className="text-cyan-400">Network Active</span>
+          <span className="text-cyan-400">2-Agent Circular Economy</span>
           <span className="flex gap-0.5">
             <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
             <span className="w-1 h-1 rounded-full bg-cyan-400 stream-dot" />
@@ -529,33 +509,33 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         </div>
       </div>
 
-      {/* Proof Details Section */}
-      {(policyProof || analystProof || agentStates.policy === 'proving' || agentStates.analyst === 'proving') && (
+      {/* Proof Details Section (2-Agent Model) */}
+      {(scoutSpendingProof || analystProof || agentStates.scout === 'proving' || agentStates.analyst === 'proving') && (
         <div className="mt-6 grid grid-cols-2 gap-4">
-          {/* Policy Proof Card */}
+          {/* Scout Spending Proof Card */}
           <div className="space-y-3">
             <ProofCard
-              title="Authorization Proof"
-              proof={policyProof}
-              isGenerating={agentStates.policy === 'proving'}
-              currentStage={policyProofStage}
-              color="purple"
-              colorHex="#a855f7"
+              title="Scout Spending Proof"
+              proof={scoutSpendingProof}
+              isGenerating={agentStates.scout === 'proving'}
+              currentStage={scoutProofStage}
+              color="blue"
+              colorHex="#3b82f6"
             />
-            {policyVerifyChecks.length > 0 && (
+            {spendingVerifyChecks.length > 0 && (
               <VerificationChecklist
-                checks={policyVerifyChecks}
-                verifyTimeMs={lastEvent?.type === 'POLICY_VERIFIED' ? lastEvent.data.verify_time_ms : undefined}
+                checks={spendingVerifyChecks}
+                verifyTimeMs={lastEvent?.type === 'SPENDING_PROOF_VERIFIED' ? lastEvent.data.verify_time_ms : undefined}
               />
             )}
           </div>
 
-          {/* Analyst Proof Card */}
+          {/* Analyst Classification Proof Card */}
           <div className="space-y-3">
             <ProofCard
               title="Classification Proof"
               proof={analystProof}
-              isGenerating={agentStates.analyst === 'proving'}
+              isGenerating={agentStates.analyst === 'proving' && !analystSpendingProof}
               currentStage={analystProofStage}
               color="cyan"
               colorHex="#22d3ee"

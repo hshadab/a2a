@@ -313,12 +313,12 @@ def build_skill_v3(
     return skill
 
 
-# ============ Pre-configured clients for our agents ============
+# ============ Pre-configured clients for our agents (2-Agent Model) ============
 
-async def get_policy_agent() -> AgentCard:
-    """Get the Policy Agent card"""
+async def get_scout_agent() -> AgentCard:
+    """Get the Scout Agent card"""
     client = A2AClient()
-    return await client.get_agent_card(config.policy_url)
+    return await client.get_agent_card(config.scout_url)
 
 
 async def get_analyst_agent() -> AgentCard:
@@ -327,44 +327,42 @@ async def get_analyst_agent() -> AgentCard:
     return await client.get_agent_card(config.analyst_url)
 
 
-async def invoke_policy_authorization(
+async def invoke_scout_discovery(
     batch_id: str,
-    url_count: int,
-    estimated_cost: float,
-    budget_remaining: float,
-    source_reputation: float,
-    novelty_score: float,
-    time_since_last: int,
-    threat_level: float,
+    limit: int = 50,
+    requester_id: str = "analyst",
     payment_receipt: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Convenience function to invoke Policy Agent authorization"""
+    """
+    Convenience function to invoke Scout Agent URL discovery.
+
+    Returns URLs + spending authorization proof for verification.
+    """
     client = A2AClient()
     return await client.invoke_skill(
-        agent_url=config.policy_url,
-        skill_id="authorize-batch",
+        agent_url=config.scout_url,
+        skill_id="discover-urls",
         input_data={
-            "batch_id": batch_id,
-            "url_count": url_count,
-            "estimated_cost_usdc": estimated_cost,
-            "budget_remaining_usdc": budget_remaining,
-            "source_reputation": source_reputation,
-            "novelty_score": novelty_score,
-            "time_since_last_batch_seconds": time_since_last,
-            "threat_level": threat_level
+            "limit": limit,
+            "requester_id": requester_id,
+            "batch_id": batch_id
         },
         payment_receipt=payment_receipt,
-        timeout=120  # Proof generation can take time
+        timeout=120  # Discovery + proof generation can take time
     )
 
 
 async def invoke_analyst_classification(
     batch_id: str,
     urls: List[str],
-    policy_proof_hash: str,
+    scout_spending_proof_hash: str,
     payment_receipt: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Convenience function to invoke Analyst Agent classification"""
+    """
+    Convenience function to invoke Analyst Agent classification.
+
+    Returns classifications + work proof + spending authorization proof for verification.
+    """
     client = A2AClient()
     return await client.invoke_skill(
         agent_url=config.analyst_url,
@@ -372,7 +370,7 @@ async def invoke_analyst_classification(
         input_data={
             "batch_id": batch_id,
             "urls": urls,
-            "policy_proof_hash": policy_proof_hash
+            "scout_spending_proof_hash": scout_spending_proof_hash
         },
         payment_receipt=payment_receipt,
         timeout=300  # Classification + proof generation for many URLs

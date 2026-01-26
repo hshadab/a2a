@@ -44,11 +44,10 @@ class Config:
     database_ssl_mode: str = os.getenv("DATABASE_SSL_MODE", "prefer")  # require, prefer, disable
 
     # ==========================================================================
-    # Agent URLs
+    # Agent URLs (2-Agent Model: Scout + Analyst)
     # ==========================================================================
     scout_url: str = os.getenv("SCOUT_URL", "http://localhost:8000")
-    policy_url: str = os.getenv("POLICY_URL", "http://localhost:8001")
-    analyst_url: str = os.getenv("ANALYST_URL", "http://localhost:8002")
+    analyst_url: str = os.getenv("ANALYST_URL", "http://localhost:8001")
 
     # ==========================================================================
     # Base Mainnet x402 Configuration
@@ -69,10 +68,14 @@ class Config:
     treasury_address: str = os.getenv("TREASURY_ADDRESS", "")
 
     # ==========================================================================
-    # Pricing (in USDC)
+    # Pricing (in USDC) - 2-Agent Circular Economy (Per-URL)
     # ==========================================================================
-    policy_price_per_decision: float = 0.001  # $0.001 per authorization
-    analyst_price_per_url: float = 0.0005     # $0.0005 per URL classification
+    # Scout charges Analyst for URL discovery (with quality work proof)
+    discovery_price_per_url: float = 0.001  # $0.001 per URL
+    # Analyst charges Scout for classification feedback (with classification work proof)
+    feedback_price_per_url: float = 0.001   # $0.001 per URL
+    # Per-URL pricing for external callers
+    analyst_price_per_url: float = 0.0005   # $0.0005 per URL classification
     payment_tolerance: float = float(os.getenv("PAYMENT_TOLERANCE", "0.001"))  # 0.1% tolerance
     x402_gas_limit: int = int(os.getenv("X402_GAS_LIMIT", "100000"))
 
@@ -89,14 +92,20 @@ class Config:
     # Path to zkml-cli binary - download from: https://github.com/hshadab/zkx402/releases
     zkml_cli_path: str = os.getenv("ZKML_CLI_PATH", "/usr/local/bin/proof_json_output")
     jolt_atlas_path: str = os.getenv("JOLT_ATLAS_PATH", "./jolt-atlas")
-    jolt_model_dir: str = os.getenv("JOLT_MODEL_DIR", "./agents/policy/models/jolt")
+    jolt_model_dir: str = os.getenv("JOLT_MODEL_DIR", "./shared/models/authorization")
+    # Shared authorization model used by both Scout and Analyst for self-authorization
     authorization_model_path: str = os.getenv(
         "AUTH_MODEL_PATH",
-        os.path.join(os.getenv("JOLT_MODEL_DIR", "./agents/policy/models/jolt"), "network.onnx")
+        os.path.join(os.getenv("JOLT_MODEL_DIR", "./shared/models/authorization"), "network.onnx")
     )
     classifier_model_path: str = os.getenv(
         "CLASSIFIER_MODEL_PATH",
         os.path.join(os.getenv("PYTHONPATH", "."), "agents/analyst/models/jolt/network.onnx")
+    )
+    # Scout's URL quality scorer model for work proof
+    quality_scorer_model_path: str = os.getenv(
+        "QUALITY_SCORER_MODEL_PATH",
+        os.path.join(os.getenv("PYTHONPATH", "."), "agents/scout/models/jolt/network.onnx")
     )
 
     # ==========================================================================

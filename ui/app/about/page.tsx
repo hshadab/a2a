@@ -22,52 +22,45 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Architecture Overview */}
+      {/* Architecture Overview (2-Agent Model) */}
       <section className="card p-8">
         <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
           <Shield className="text-cyan-400" />
-          Architecture Overview
+          2-Agent Architecture with Mutual Work Verification
         </h2>
 
-        {/* Agents shown in payment order: Analyst → Scout → Policy → Analyst */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
+        {/* 2 Agents with bidirectional flow */}
+        <div className="grid grid-cols-2 gap-8 mb-8">
           <AgentBox
             icon={<Microscope size={24} />}
-            name="URL Classifier"
-            role="Customer & Orchestrator"
+            name="URL Classifier (Analyst)"
+            role="Self-Authorization + Classification"
             color="#22d3ee"
-            description="Pays Scout for URLs, classifies them as phishing/safe, and stores results. Receives feedback payments from Policy."
+            description="Generates and self-verifies spending proof before paying Scout (prevents rogue spending). Classifies URLs with zkML work proofs."
           />
           <AgentBox
             icon={<Search size={24} />}
             name="Threat Scout"
-            role="URL Discovery Service"
+            role="Self-Authorization + Discovery"
             color="#3b82f6"
-            description="Discovers threats from CT logs, typosquatting, and feeds. Receives from Analyst, pays Policy for authorization."
-          />
-          <AgentBox
-            icon={<Scale size={24} />}
-            name="Policy Agent"
-            role="Authorization & Feedback"
-            color="#a855f7"
-            description="Authorizes spending with zkML proofs. Receives from Scout, pays Analyst for classification feedback."
+            description="Generates and self-verifies spending proof before paying Analyst (prevents rogue spending). Discovers threats from CT logs, typosquatting, and feeds."
           />
         </div>
 
-        {/* Flow Diagram - Circular Economy */}
+        {/* Flow Diagram - 2-Agent Circular Economy */}
         <div className="bg-gray-800/50 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">Circular Payment Flow</h3>
-          <div className="flex items-center justify-between text-sm">
-            <FlowStep number={1} text="Analyst pays Scout $0.001" />
-            <ArrowRight className="text-green-500" />
-            <FlowStep number={2} text="Scout pays Policy $0.001" />
-            <ArrowRight className="text-green-500" />
-            <FlowStep number={3} text="Policy pays Analyst $0.001" />
+          <h3 className="text-lg font-semibold text-white mb-4">2-Agent Mutual Work Verification Flow</h3>
+          <div className="flex items-center justify-center gap-4 text-sm">
+            <FlowStep number={1} text="Scout discovers URLs" />
+            <ArrowRight className="text-blue-500" />
+            <FlowStep number={2} text="Scout generates work proof" />
             <ArrowRight className="text-cyan-500" />
-            <FlowStep number={4} text="Net change: $0.00" />
+            <FlowStep number={3} text="Analyst verifies work proof" />
+            <ArrowRight className="text-green-500" />
+            <FlowStep number={4} text="Analyst pays Scout" />
           </div>
           <p className="text-center text-gray-500 text-xs mt-3">
-            USDC circulates forever. Only gas (~$0.003 per batch) is consumed.
+            Buyer verifies seller's work proof before paying. Each agent self-verifies spending proof. Only gas (~$0.002 per batch) is consumed.
           </p>
         </div>
       </section>
@@ -293,12 +286,12 @@ let proof = jolt_atlas::prove(
         </TechSection>
       </div>
 
-      {/* Agent-to-Agent Micro-Economy */}
+      {/* Agent-to-Agent Micro-Economy (2-Agent Model) */}
       <section className="card p-8 border border-cyan-500/20">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
             <Zap className="text-yellow-400" />
-            Agent-to-Agent Micro-Economy
+            2-Agent Circular Economy with Self-Authorization
           </h2>
           <span className="px-3 py-1 bg-green-500/10 border border-green-500/30 rounded-full text-sm text-green-400">
             Self-Sustaining
@@ -306,54 +299,49 @@ let proof = jolt_atlas::prove(
         </div>
 
         <p className="text-lg text-gray-300 mb-6 border-l-4 border-cyan-500 pl-4">
-          ThreatProof demonstrates a <strong className="text-cyan-400">circular agent economy</strong> —
-          each agent pays the next, creating a closed loop where USDC circulates forever.
-          Only gas is consumed.
+          ThreatProof demonstrates a <strong className="text-cyan-400">2-agent circular economy</strong> where
+          each agent generates and self-verifies its own spending proof before spending (prevents rogue agents).
+          USDC circulates forever. Only gas is consumed.
         </p>
 
-        {/* Circular Flow Diagram */}
+        {/* Circular Flow Diagram (2-Agent) */}
         <div className="bg-gray-800/50 rounded-lg p-6 mb-6">
-          <h3 className="text-lg font-semibold text-white mb-4 text-center">Circular Payment Flow</h3>
-          <div className="flex items-center justify-center gap-4 text-sm">
+          <h3 className="text-lg font-semibold text-white mb-4 text-center">2-Agent Circular Payment Flow</h3>
+          <div className="flex items-center justify-center gap-8 text-sm">
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
-                <span className="text-cyan-400 font-bold">A</span>
+              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
+                <span className="text-cyan-400 font-bold text-xl">A</span>
               </div>
               <span className="text-gray-400">Analyst</span>
+              <span className="block text-xs text-cyan-400">Self-Auth</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-green-400 text-xs mb-1">$0.001</span>
-              <ArrowRight className="text-green-400" />
+              <div className="text-green-400 text-xs mb-1">$0.001</div>
+              <ArrowRight className="text-green-400" size={32} />
+              <div className="text-cyan-400 text-xs mt-1">Discovery</div>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
-                <span className="text-blue-400 font-bold">S</span>
+              <div className="w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
+                <span className="text-blue-400 font-bold text-xl">S</span>
               </div>
               <span className="text-gray-400">Scout</span>
+              <span className="block text-xs text-blue-400">Self-Auth</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-green-400 text-xs mb-1">$0.001</span>
-              <ArrowRight className="text-green-400" />
+              <div className="text-green-400 text-xs mb-1">$0.001</div>
+              <ArrowRight className="text-green-400 rotate-180" size={32} />
+              <div className="text-blue-400 text-xs mt-1">Feedback</div>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-purple-500/20 border-2 border-purple-500 flex items-center justify-center mb-2">
-                <span className="text-purple-400 font-bold">P</span>
-              </div>
-              <span className="text-gray-400">Policy</span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-green-400 text-xs mb-1">$0.001</span>
-              <ArrowRight className="text-green-400" />
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
-                <span className="text-cyan-400 font-bold">A</span>
+              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
+                <span className="text-cyan-400 font-bold text-xl">A</span>
               </div>
               <span className="text-gray-400">Analyst</span>
+              <span className="block text-xs text-cyan-400">Receives</span>
             </div>
           </div>
           <p className="text-center text-gray-500 text-xs mt-4">
-            Each agent pays $0.001 and receives $0.001 → Net change: $0.00
+            Each agent generates spending proof → self-verifies → pays $0.001. Net change: $0.00
           </p>
         </div>
 
@@ -366,11 +354,7 @@ let proof = jolt_atlas::prove(
                 <span className="text-green-400">$0.001 (discovery)</span>
               </div>
               <div className="flex justify-between text-gray-400">
-                <span>Scout → Policy:</span>
-                <span className="text-green-400">$0.001 (authorization)</span>
-              </div>
-              <div className="flex justify-between text-gray-400">
-                <span>Policy → Analyst:</span>
+                <span>Scout → Analyst:</span>
                 <span className="text-green-400">$0.001 (feedback)</span>
               </div>
               <div className="border-t border-gray-700 pt-2 flex justify-between text-gray-400">
@@ -379,18 +363,18 @@ let proof = jolt_atlas::prove(
               </div>
               <div className="flex justify-between text-gray-400">
                 <span>Only real cost:</span>
-                <span className="text-yellow-400">~$0.003 gas (3 txns)</span>
+                <span className="text-yellow-400">~$0.002 gas (2 txns)</span>
               </div>
             </div>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-white mb-4">Why This Matters</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Why Mutual Work Verification Matters</h3>
             <ul className="space-y-3 text-gray-400">
-              <FeatureItem text="True Circular Economy: USDC flows in a loop, never depletes" />
-              <FeatureItem text="Separate Wallets: Each agent owns its funds independently" />
-              <FeatureItem text="Only Gas Costs: ~$3 of ETH runs thousands of batches" />
-              <FeatureItem text="Proof-Gated: Every payment requires valid zkML proof first" />
+              <FeatureItem text="Work Proof: Seller proves they did work (Scout: quality scoring, Analyst: classification)" />
+              <FeatureItem text="Buyer Verification: Buyer verifies seller's work proof before paying" />
+              <FeatureItem text="Self-Authorization: Each agent self-verifies spending proof (prevents rogue spending)" />
+              <FeatureItem text="zkML Guarantees: Both work and spending decisions are cryptographically verified" />
             </ul>
           </div>
         </div>

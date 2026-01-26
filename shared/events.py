@@ -133,51 +133,45 @@ broadcaster = EventBroadcaster()
 
 
 # ============ Convenience functions for common events ============
+# 2-Agent Model: Scout + Analyst with self-authorization (Per-URL)
 
-async def emit_scout_found_urls(batch_id: str, url_count: int, source: str, sample_urls: list = None):
+async def emit_scout_found_urls(request_id: str, url_count: int, source: str, sample_urls: list = None):
+    """Scout found URL(s) from source"""
     await broadcaster.broadcast_dict(
         EventType.SCOUT_FOUND_URLS,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "url_count": url_count,
             "source": source,
-            "sample_urls": sample_urls[:5] if sample_urls else []  # Show first 5 URLs
+            "sample_urls": sample_urls[:5] if sample_urls else []
         }
     )
 
 
-async def emit_policy_requesting(batch_id: str, url_count: int, estimated_cost: float):
+async def emit_scout_authorizing(request_id: str, url_count: int, estimated_cost: float):
+    """Scout is generating a spending authorization proof"""
     await broadcaster.broadcast_dict(
-        EventType.POLICY_REQUESTING,
+        EventType.SCOUT_AUTHORIZING,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "url_count": url_count,
-            "estimated_cost_usdc": estimated_cost
+            "estimated_cost": estimated_cost
         }
     )
 
 
-async def emit_policy_proving(batch_id: str, progress: Optional[float] = None):
-    await broadcaster.broadcast_dict(
-        EventType.POLICY_PROVING,
-        {
-            "batch_id": batch_id,
-            "progress": progress
-        }
-    )
-
-
-async def emit_policy_response(
-    batch_id: str,
+async def emit_scout_authorized(
+    request_id: str,
     decision: str,
     confidence: float,
     proof_hash: str,
     prove_time_ms: int
 ):
+    """Scout spending authorization proof generated"""
     await broadcaster.broadcast_dict(
-        EventType.POLICY_RESPONSE,
+        EventType.SCOUT_AUTHORIZED,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "decision": decision,
             "confidence": confidence,
             "proof_hash": proof_hash,
@@ -186,106 +180,167 @@ async def emit_policy_response(
     )
 
 
-async def emit_policy_verified(batch_id: str, valid: bool, verify_time_ms: int):
+async def emit_analyst_authorizing(request_id: str, estimated_cost: float):
+    """Analyst is generating a spending authorization proof"""
     await broadcaster.broadcast_dict(
-        EventType.POLICY_VERIFIED,
+        EventType.ANALYST_AUTHORIZING,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
+            "estimated_cost": estimated_cost
+        }
+    )
+
+
+async def emit_analyst_authorized(
+    request_id: str,
+    decision: str,
+    confidence: float,
+    proof_hash: str,
+    prove_time_ms: int
+):
+    """Analyst spending authorization proof generated"""
+    await broadcaster.broadcast_dict(
+        EventType.ANALYST_AUTHORIZED,
+        {
+            "request_id": request_id,
+            "decision": decision,
+            "confidence": confidence,
+            "proof_hash": proof_hash,
+            "prove_time_ms": prove_time_ms
+        }
+    )
+
+
+async def emit_spending_proof_verified(request_id: str, agent: str, valid: bool, verify_time_ms: int):
+    """A spending proof was self-verified by the agent before spending"""
+    await broadcaster.broadcast_dict(
+        EventType.SPENDING_PROOF_VERIFIED,
+        {
+            "request_id": request_id,
+            "agent": agent,  # "scout" or "analyst"
             "valid": valid,
             "verify_time_ms": verify_time_ms
         }
     )
 
 
-async def emit_payment_sending(batch_id: str, amount: float, recipient: str):
+async def emit_payment_sending(request_id: str, amount: float, recipient: str):
+    """Payment is being sent"""
     await broadcaster.broadcast_dict(
         EventType.PAYMENT_SENDING,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "amount_usdc": amount,
             "recipient": recipient
         }
     )
 
 
-async def emit_payment_sent(batch_id: str, tx_hash: str, amount: float):
+async def emit_payment_sent(request_id: str, tx_hash: str, amount: float):
+    """Payment was sent successfully"""
     await broadcaster.broadcast_dict(
         EventType.PAYMENT_SENT,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "tx_hash": tx_hash,
             "amount_usdc": amount
         }
     )
 
 
-async def emit_analyst_processing(batch_id: str, url_count: int, progress: Optional[int] = None):
+async def emit_analyst_processing(request_id: str, url_count: int, progress: Optional[int] = None):
+    """Analyst is processing URL(s)"""
     await broadcaster.broadcast_dict(
         EventType.ANALYST_PROCESSING,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "url_count": url_count,
             "progress": progress
         }
     )
 
 
-async def emit_analyst_proving(batch_id: str, progress: Optional[float] = None):
+async def emit_analyst_proving(request_id: str, progress: Optional[float] = None):
+    """Analyst is generating classification proof"""
     await broadcaster.broadcast_dict(
         EventType.ANALYST_PROVING,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "progress": progress
         }
     )
 
 
 async def emit_analyst_response(
-    batch_id: str,
-    phishing_count: int,
-    safe_count: int,
-    suspicious_count: int,
-    proof_hash: str,
-    prove_time_ms: int,
+    request_id: str,
+    classification: str = None,
+    confidence: float = None,
+    proof_hash: str = None,
+    prove_time_ms: int = None,
+    # Legacy batch fields (for backward compatibility)
+    phishing_count: int = None,
+    safe_count: int = None,
+    suspicious_count: int = None,
     sample_results: list = None
 ):
-    await broadcaster.broadcast_dict(
-        EventType.ANALYST_RESPONSE,
-        {
-            "batch_id": batch_id,
-            "phishing_count": phishing_count,
-            "safe_count": safe_count,
-            "suspicious_count": suspicious_count,
-            "proof_hash": proof_hash,
-            "prove_time_ms": prove_time_ms,
-            "sample_results": sample_results[:5] if sample_results else []  # Show first 5 classified URLs
-        }
-    )
+    """Analyst classification complete"""
+    data = {"request_id": request_id}
+
+    # Single URL response
+    if classification is not None:
+        data["classification"] = classification
+        data["confidence"] = confidence
+
+    # Proof info
+    if proof_hash is not None:
+        data["proof_hash"] = proof_hash
+    if prove_time_ms is not None:
+        data["prove_time_ms"] = prove_time_ms
+
+    # Legacy batch fields
+    if phishing_count is not None:
+        data["phishing_count"] = phishing_count
+    if safe_count is not None:
+        data["safe_count"] = safe_count
+    if suspicious_count is not None:
+        data["suspicious_count"] = suspicious_count
+    if sample_results:
+        data["sample_results"] = sample_results[:5]
+
+    await broadcaster.broadcast_dict(EventType.ANALYST_RESPONSE, data)
 
 
-async def emit_work_verified(batch_id: str, valid: bool, verify_time_ms: int):
-    await broadcaster.broadcast_dict(
-        EventType.WORK_VERIFIED,
-        {
-            "batch_id": batch_id,
-            "valid": valid,
-            "verify_time_ms": verify_time_ms
-        }
-    )
+async def emit_work_verified(
+    request_id: str,
+    valid: bool,
+    verify_time_ms: int,
+    quality_tier: str = None
+):
+    """Work proof was verified by the buyer"""
+    data = {
+        "request_id": request_id,
+        "valid": valid,
+        "verify_time_ms": verify_time_ms
+    }
+    if quality_tier:
+        data["quality_tier"] = quality_tier
+
+    await broadcaster.broadcast_dict(EventType.WORK_VERIFIED, data)
 
 
 async def emit_database_updated(
-    batch_id: str,
+    request_id: str,
     urls_added: int,
     total_urls: int,
     total_phishing: int,
     total_safe: int,
     total_suspicious: int
 ):
+    """Database was updated with new classifications"""
     await broadcaster.broadcast_dict(
         EventType.DATABASE_UPDATED,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "urls_added": urls_added,
             "total_urls": total_urls,
             "total_phishing": total_phishing,
@@ -295,11 +350,12 @@ async def emit_database_updated(
     )
 
 
-async def emit_error(batch_id: Optional[str], error: str, details: Optional[str] = None):
+async def emit_error(request_id: Optional[str], error: str, details: Optional[str] = None):
+    """Error occurred during processing"""
     await broadcaster.broadcast_dict(
         EventType.ERROR,
         {
-            "batch_id": batch_id,
+            "request_id": request_id,
             "error": error,
             "details": details
         }
