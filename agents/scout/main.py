@@ -777,93 +777,100 @@ async def discover_url(request: DiscoverRequest) -> DiscoverResponse:
     6. If valid, Analyst pays Scout $0.001
     7. If invalid, no payment
     """
-    request_id = str(uuid.uuid4())
-    logger.info(f"URL Discovery request: {request_id}")
+    import traceback
+    try:
+        request_id = str(uuid.uuid4())
+        logger.info(f"URL Discovery request: {request_id}")
 
-    await emit_scout_found_urls(request_id, 0, "discovering", [])
+        await emit_scout_found_urls(request_id, 0, "discovering", [])
 
-    # 1. Discover single URL from sources
-    url, source_name, source_reputation = await scout._discover_url()
+        # 1. Discover single URL from sources
+        url, source_name, source_reputation = await scout._discover_url()
 
-    if not url:
-        raise HTTPException(
-            status_code=404,
-            detail="No new URL discovered from sources"
+        if not url:
+            raise HTTPException(
+                status_code=404,
+                detail="No new URL discovered from sources"
+            )
+
+        logger.info(f"Discovered URL from {source_name}: {url[:50]}...")
+
+        await emit_scout_found_urls(request_id, 1, source_name, [url])
+
+        # 2. Generate quality work proof (Scout's work proof for Analyst to verify)
+        work_proof_data = await scout._generate_quality_work_proof(
+            request_id=request_id,
+            url=url,
+            source_reputation=source_reputation
         )
 
-    logger.info(f"Discovered URL from {source_name}: {url[:50]}...")
+        # 3. Get current budget
+        budget = await scout._get_budget()
 
-    await emit_scout_found_urls(request_id, 1, source_name, [url])
+        # Calculate discovery cost (per URL)
+        discovery_cost = config.discovery_price_per_url
 
-    # 2. Generate quality work proof (Scout's work proof for Analyst to verify)
-    work_proof_data = await scout._generate_quality_work_proof(
-        request_id=request_id,
-        url=url,
-        source_reputation=source_reputation
-    )
-
-    # 3. Get current budget
-    budget = await scout._get_budget()
-
-    # Calculate discovery cost (per URL)
-    discovery_cost = config.discovery_price_per_url
-
-    # 4. Generate self-authorization spending proof (Scout self-verifies)
-    spending_proof_data = await scout._generate_spending_proof(
-        batch_id=request_id,
-        url_count=1,
-        estimated_cost=discovery_cost,
-        budget_remaining=budget,
-        source_reputation=source_reputation
-    )
-
-    if spending_proof_data.get("decision") != "AUTHORIZED":
-        raise HTTPException(
-            status_code=403,
-            detail=f"Self-authorization denied: {spending_proof_data.get('decision')}"
+        # 4. Generate self-authorization spending proof (Scout self-verifies)
+        spending_proof_data = await scout._generate_spending_proof(
+            batch_id=request_id,
+            url_count=1,
+            estimated_cost=discovery_cost,
+            budget_remaining=budget,
+            source_reputation=source_reputation
         )
 
-    # 5. Build response with work proof and spending proof
-    spending_proof = SpendingProof(
-        decision=spending_proof_data["decision"],
-        confidence=spending_proof_data["confidence"],
-        proof=spending_proof_data["proof"],
-        proof_hash=spending_proof_data["proof_hash"],
-        model_commitment=spending_proof_data["model_commitment"],
-        input_commitment=spending_proof_data["input_commitment"],
-        output_commitment=spending_proof_data["output_commitment"],
-        prove_time_ms=spending_proof_data["prove_time_ms"]
-    )
+        if spending_proof_data.get("decision") != "AUTHORIZED":
+            raise HTTPException(
+                status_code=403,
+                detail=f"Self-authorization denied: {spending_proof_data.get('decision')}"
+            )
 
-    work_proof = WorkProof(
-        quality_tier=work_proof_data["quality_tier"],
-        confidence=work_proof_data["confidence"],
-        proof=work_proof_data["proof"],
-        proof_hash=work_proof_data["proof_hash"],
-        model_commitment=work_proof_data["model_commitment"],
-        input_commitment=work_proof_data["input_commitment"],
-        output_commitment=work_proof_data["output_commitment"],
-        prove_time_ms=work_proof_data["prove_time_ms"]
-    )
+        # 5. Build response with work proof and spending proof
+        spending_proof = SpendingProof(
+            decision=spending_proof_data["decision"],
+            confidence=spending_proof_data["confidence"],
+            proof=spending_proof_data["proof"],
+            proof_hash=spending_proof_data["proof_hash"],
+            model_commitment=spending_proof_data["model_commitment"],
+            input_commitment=spending_proof_data["input_commitment"],
+            output_commitment=spending_proof_data["output_commitment"],
+            prove_time_ms=spending_proof_data["prove_time_ms"]
+        )
 
-    payment_due = PaymentDue(
-        amount=discovery_cost,
-        currency="USDC",
-        recipient=config.treasury_address,
-        chain=config.base_chain_caip2,
-        memo=f"discover-{request_id}"
-    )
+        work_proof = WorkProof(
+            quality_tier=work_proof_data["quality_tier"],
+            confidence=work_proof_data["confidence"],
+            proof=work_proof_data["proof"],
+            proof_hash=work_proof_data["proof_hash"],
+            model_commitment=work_proof_data["model_commitment"],
+            input_commitment=work_proof_data["input_commitment"],
+            output_commitment=work_proof_data["output_commitment"],
+            prove_time_ms=work_proof_data["prove_time_ms"]
+        )
 
-    return DiscoverResponse(
-        request_id=request_id,
-        url=url,
-        source=source_name,
-        source_reputation=source_reputation,
-        spending_proof=spending_proof,
-        work_proof=work_proof,
-        timestamp=datetime.utcnow().isoformat(),
-        payment_due=payment_due
-    )
+        payment_due = PaymentDue(
+            amount=discovery_cost,
+            currency="USDC",
+            recipient=config.treasury_address,
+            chain=config.base_chain_caip2,
+            memo=f"discover-{request_id}"
+        )
+
+        return DiscoverResponse(
+            request_id=request_id,
+            url=url,
+            source=source_name,
+            source_reputation=source_reputation,
+            spending_proof=spending_proof,
+            work_proof=work_proof,
+            timestamp=datetime.utcnow().isoformat(),
+            payment_due=payment_due
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"discover-url error: {e}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Discovery failed: {str(e)}")
 
 
 class ConfirmDiscoveryPaymentRequest(BaseModel):
