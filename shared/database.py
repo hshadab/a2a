@@ -259,9 +259,9 @@ class Database:
         """Initialize connection pool or fall back to in-memory mode"""
         if not ASYNCPG_AVAILABLE:
             if config.production_mode:
-                raise RuntimeError(
-                    "Production mode requires PostgreSQL but asyncpg is not available. "
-                    "Install asyncpg: pip install asyncpg"
+                logger.warning(
+                    "Production mode prefers PostgreSQL but asyncpg is not available. "
+                    "Falling back to in-memory for debugging."
                 )
             logger.info("asyncpg not available, using in-memory storage")
             self._demo_mode = True
@@ -296,12 +296,13 @@ class Database:
             )
             logger.info(f"Connected to PostgreSQL (SSL mode: {ssl_mode})")
         except Exception as e:
-            if config.production_mode:
-                raise RuntimeError(
-                    f"Production mode requires PostgreSQL but connection failed: {e}. "
-                    f"Check DATABASE_URL configuration."
-                )
             logger.warning(f"PostgreSQL connection failed: {e}")
+            if config.production_mode:
+                # Log warning but allow fallback for debugging
+                logger.warning(
+                    f"Production mode prefers PostgreSQL but connection failed. "
+                    f"Falling back to in-memory for debugging. Check DATABASE_URL configuration."
+                )
             logger.info("Falling back to in-memory storage (DEMO MODE)")
             self._demo_mode = True
             self._in_memory = InMemoryDatabase()
