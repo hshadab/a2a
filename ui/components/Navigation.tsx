@@ -79,11 +79,10 @@ export default function Navigation() {
     return () => clearInterval(interval);
   }, []);
 
-  const estimatedBatches = balance ? Math.floor(balance.eth / 0.000001) : 0;
   const shortAddress = `${TREASURY_ADDRESS.slice(0, 6)}...${TREASURY_ADDRESS.slice(-4)}`;
 
   return (
-    <nav className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
+    <nav className="border-b border-[#2a2a2a] bg-[#0a0a0a] sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6">
         {/* Top Row: Logo, Title, Status */}
         <div className="flex items-center justify-between h-20 border-b border-gray-800/50">
@@ -173,14 +172,6 @@ export default function Navigation() {
               </div>
             </div>
 
-            {/* Runway */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500 uppercase">Runway</span>
-              <span className="text-base text-purple-400 font-mono font-bold">
-                {loading ? '...' : `~${estimatedBatches.toLocaleString()} batches`}
-              </span>
-            </div>
-
             {/* Basescan Link */}
             <a
               href={`https://basescan.org/address/${TREASURY_ADDRESS}`}
@@ -200,8 +191,8 @@ export default function Navigation() {
               <span className="w-2 h-2 rounded-full bg-green-500" />
               Self-sustaining
             </span>
-            <span>Batches every 5 min</span>
-            <span>USDC circulates internally, only gas consumed</span>
+            <span>$0.001/URL circular economy</span>
+            <span>Only gas consumed</span>
           </div>
         </div>
       </div>
