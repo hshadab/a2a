@@ -166,7 +166,8 @@ class AnalystAgent:
         """Get or create Redis connection"""
         if self._redis is None:
             try:
-                self._redis = await redis.from_url(config.redis_url)
+                logger.info(f"Connecting to Redis at: {config.redis_url[:30]}...")
+                self._redis = await redis.from_url(config.redis_url, decode_responses=False)
                 await self._redis.ping()
                 logger.info("Connected to Redis for persistence")
             except Exception as e:
@@ -790,7 +791,9 @@ async def health():
         "wallet_address": wallet_address,
         "wallet_balance_usdc": wallet_balance,
         "scout_url": config.scout_url,
-        "database_mode": "in-memory" if db._demo_mode else "postgresql"
+        "database_mode": "in-memory" if db._demo_mode else "postgresql",
+        "redis_connected": analyst_agent._redis is not None,
+        "redis_url_configured": bool(config.redis_url and config.redis_url != "redis://localhost:6379")
     }
 
 
