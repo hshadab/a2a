@@ -2,7 +2,13 @@
 
 A long-running, compounding demonstration of **A2A + x402 + Jolt Atlas zkML**.
 
-Agents continuously build a threat intelligence database by classifying URLs. The system runs for days/weeks, gets more valuable over time, and demonstrates why zkML is "must have" for trustless agent collaboration.
+Two autonomous agents continuously build a threat intelligence database by discovering and classifying URLs. Each agent self-authorizes its spending with zkML proofs, creating a trustless circular micro-economy.
+
+## Live Demo
+
+- **Dashboard**: https://threat-intel-dashboard.onrender.com
+- **Scout Agent**: https://threat-intel-scout.onrender.com
+- **Analyst Agent**: https://threat-intel-analyst.onrender.com
 
 ## The Vision
 
@@ -18,50 +24,73 @@ Set it up. Walk away. Come back and watch it grow.
 ## Architecture
 
 ```
-┌─────────┐      ┌─────────┐      ┌─────────┐
-│  SCOUT  │ ───► │ POLICY  │ ───► │ ANALYST │
-│         │ A2A  │         │ A2A  │         │
-│ Finds   │      │Approves │      │Classifies│
-│ URLs    │      │spending │      │URLs     │
-│         │      │         │      │         │
-│ No proof│      │ zkML #1 │      │ zkML #2 │
-└─────────┘      └─────────┘      └─────────┘
-     │                                 │
-     │                                 │
-     │         ┌──────────────────────┐│
-     │         │       DATABASE       ││
-     │         │                      ▼│
-     │         │  URLs: 147,832       │
-     │         │  Phishing: 24,291    │
-     │         │  Safe: 119,847       │
-     │         │  Proofs: 147,832 ✓   │
-     │         └──────────────────────┘
-     │                    │
-     │                    │ Context improves
-     │                    │ future classifications
-     └────────────────────┴───────────────────────►
+┌─────────────────────┐         ┌─────────────────────┐
+│     URL SCOUT       │◄───────►│   THREAT ANALYST    │
+│                     │  A2A    │                     │
+│  • Discovers URLs   │  +      │  • Classifies URLs  │
+│  • Scores quality   │  x402   │  • Returns verdict  │
+│                     │         │                     │
+│  zkML Proofs:       │         │  zkML Proofs:       │
+│  ├─ Spending Auth   │         │  ├─ Spending Auth   │
+│  └─ Quality Score   │         │  └─ Classification  │
+│                     │         │                     │
+│  Wallet: 0x269C...  │         │  Wallet: 0x7ee8...  │
+└─────────────────────┘         └─────────────────────┘
+         │                               │
+         │      $0.001 / batch           │
+         └───────────────────────────────┘
+                 (circular flow)
+
+                      │
+                      ▼
+           ┌──────────────────────┐
+           │       DATABASE       │
+           │                      │
+           │  URLs: 147,832       │
+           │  Phishing: 24,291    │
+           │  Safe: 119,847       │
+           │  Proofs: 147,832 ✓   │
+           └──────────────────────┘
 ```
+
+### Payment Flow
+
+The agents form a circular micro-economy:
+- **Analyst → Scout**: $0.001 for URL discovery batches
+- **Scout → Analyst**: $0.001 for classification feedback
+
+Net USDC movement: $0 (only gas consumed)
+Real value created: A growing, zkML-verified threat intelligence database
 
 ## Technologies
 
 | Component | Technology |
 |-----------|------------|
-| Agent Communication | **A2A** (Google Agent-to-Agent Protocol) |
+| Agent Communication | **A2A v0.3** (Google Agent-to-Agent Protocol) |
 | Payments | **x402** on Base Mainnet (USDC) |
 | Proofs | **Jolt Atlas zkML** |
 | Database | PostgreSQL |
 | UI | Next.js + Tailwind |
+| Deployment | Render |
 
-## Two Proofs, Two Trust Problems
+## Three Types of zkML Proofs
 
-### Proof #1: Policy (Authorization)
-- Proves spending authorization was computed correctly
-- Uses Jolt Atlas `authorization.onnx` model
-- Without proof: Policy Agent could approve everything or deny competitors
+### 1. Spending Authorization (Both Agents)
+- Proves spending is within policy limits
+- Uses `authorization.onnx` model (7 inputs → 2 outputs)
+- Input: `[amount, balance, daily_spent, hourly_spent, trust_score, hour, is_weekday]`
+- Without proof: Agents could overspend or drain wallets
 
-### Proof #2: Work (Classification)
+### 2. Quality Score (Scout)
+- Proves URL quality tier was computed correctly
+- Uses `quality_scorer.onnx` model (32 inputs → 4 outputs)
+- Output: HIGH / MEDIUM / LOW / NOISE
+- Without proof: Scout could claim high-quality sources
+
+### 3. Classification (Analyst)
 - Proves URL classification was actually performed
-- Uses Jolt Atlas `url_classifier.onnx` model
+- Uses `url_classifier.onnx` model (32 inputs → 3 outputs)
+- Output: PHISHING / SUSPICIOUS / SAFE
 - Without proof: Analyst could return fake classifications
 
 ## Quick Start
@@ -94,7 +123,7 @@ make setup-zkml
 make validate
 ```
 
-The zkML prover is a 143MB binary that generates cryptographic proofs.
+The zkML prover is a ~143MB binary that generates cryptographic proofs.
 Without it, the system runs in demo mode with simulated proofs.
 
 ### 3. Run with Docker
@@ -106,8 +135,7 @@ make run
 
 Services:
 - **Scout Agent**: http://localhost:8000
-- **Policy Agent**: http://localhost:8001
-- **Analyst Agent**: http://localhost:8002
+- **Analyst Agent**: http://localhost:8001
 - **UI Dashboard**: http://localhost:3001
 
 ### 4. Watch It Work
@@ -115,15 +143,14 @@ Services:
 Open http://localhost:3001 to see the real-time dashboard.
 
 The system will:
-1. Scout discovers URLs every 5 minutes
-2. Policy Agent authorizes with zkML proof
+1. Scout discovers URLs from threat feeds (OpenPhish, URLhaus, CT logs)
+2. Scout generates spending authorization proof
 3. Scout pays Analyst via x402 (USDC on Base)
-4. Analyst classifies with zkML proof
-5. Database grows, context improves
+4. Analyst classifies URLs with zkML proof
+5. Scout verifies proof, pays feedback reward
+6. Database grows, patterns emerge
 
 ## Demo vs Production Mode
-
-The system has two operating modes:
 
 ### Demo Mode (default)
 - Simulated zkML proofs (fast, no binary needed)
@@ -147,31 +174,50 @@ make validate
 
 ## Pricing (Configurable)
 
-| Agent | Price |
-|-------|-------|
-| Policy | $0.001 per authorization |
-| Analyst | $0.0005 per URL |
+| Payment | Amount | Direction |
+|---------|--------|-----------|
+| Discovery | $0.001/batch | Analyst → Scout |
+| Feedback | $0.001/batch | Scout → Analyst |
 
-For a batch of 50 URLs: ~$0.026 total
+For a batch of 50 URLs: ~$0.002 total (net $0)
 
 ## Project Structure
 
 ```
 threat-intel-network/
 ├── agents/
-│   ├── scout/          # Discovers URLs, orchestrates pipeline
-│   ├── policy/         # Authorization with zkML proofs
-│   └── analyst/        # Classification with zkML proofs
+│   ├── scout/           # URL discovery + quality scoring
+│   │   ├── main.py      # FastAPI server with A2A endpoints
+│   │   ├── sources/     # URL sources (OpenPhish, URLhaus, CT logs)
+│   │   └── models/      # Quality scorer ONNX model
+│   └── analyst/         # URL classification
+│       ├── main.py      # FastAPI server with A2A endpoints
+│       ├── features.py  # Feature extraction
+│       └── models/      # Classifier ONNX model
 ├── shared/
-│   ├── a2a.py          # A2A protocol implementation
-│   ├── x402.py         # x402 payment (Base mainnet USDC)
-│   ├── database.py     # PostgreSQL client
-│   ├── prover.py       # Jolt Atlas wrapper
-│   └── events.py       # WebSocket broadcasting
-├── ui/                 # Next.js dashboard
+│   ├── a2a.py           # A2A protocol implementation
+│   ├── x402.py          # x402 payment (Base mainnet USDC)
+│   ├── database.py      # PostgreSQL client
+│   ├── prover.py        # Jolt Atlas zkML wrapper
+│   ├── events.py        # WebSocket broadcasting
+│   └── config.py        # Environment configuration
+├── ui/                  # Next.js dashboard
+│   ├── app/             # Next.js 13+ app router
+│   └── components/      # React components
+├── jolt-atlas/          # zkML prover (submodule)
 ├── docker-compose.yml
+├── render.yaml          # Render deployment config
 └── Makefile
 ```
+
+## URL Sources
+
+| Source | Type | Reputation |
+|--------|------|------------|
+| OpenPhish | Aggregated phishing feed | 0.90 |
+| URLhaus | Malware URL feed | 0.85 |
+| Certificate Transparency | Real-time cert monitoring | 0.65 |
+| Typosquat Detection | Brand impersonation | 0.70 |
 
 ## Development
 
@@ -221,27 +267,29 @@ make stats
 ## Why zkML is "Must Have"
 
 ### Without Proofs
-- Policy Agent could approve everything (or deny competitors)
+- Agents could approve all spending (drain wallets)
+- Scout could claim fake high-quality scores
 - Analyst could return fake classifications
 - No way to verify work was done
 - Database could be full of garbage
 
 ### With zkML Proofs
-- Every authorization is cryptographically verified
-- Every classification is provably correct
+- Every spending decision is cryptographically verified
+- Every quality score is provably correct
+- Every classification is verifiable
 - Model commitment binds exact computation
 - Trustless agent collaboration
 
 ## x402 Payment Flow
 
 ```
-Scout → Analyst: POST /classify-urls
+Scout → Analyst: POST /skills/classify-urls
 Analyst → Scout: HTTP 402 Payment Required
-                 X-402-Payment: {amount: "0.025", token: "USDC", chain: 8453}
-Scout: [Makes USDC transfer on Base]
-Scout → Analyst: POST /classify-urls
+                 X-402-Payment: {amount: "0.001", token: "USDC", chain: 8453}
+Scout: [Generates spending proof, makes USDC transfer on Base]
+Scout → Analyst: POST /skills/classify-urls
                  X-402-Receipt: 0x7f3a8b2c...
-Analyst: [Verifies payment, processes request]
+Analyst: [Verifies payment, verifies spending proof, processes request]
 ```
 
 ## Environment Variables
@@ -251,8 +299,32 @@ Analyst: [Verifies payment, processes request]
 | `DATABASE_URL` | PostgreSQL connection string |
 | `REDIS_URL` | Redis connection string |
 | `PRIVATE_KEY` | Wallet private key for payments |
-| `TREASURY_ADDRESS` | Address to receive payments |
+| `ANALYST_URL` | Analyst agent endpoint |
+| `SCOUT_URL` | Scout agent endpoint |
 | `BASE_RPC_URL` | Base mainnet RPC endpoint |
+| `PRODUCTION_MODE` | Enable real proofs and payments |
+
+## API Endpoints
+
+### Scout Agent
+- `GET /.well-known/agent.json` - A2A agent card
+- `POST /skills/discover-url` - Discover and return URLs
+- `GET /health` - Health check
+- `GET /stats` - Processing statistics
+
+### Analyst Agent
+- `GET /.well-known/agent.json` - A2A agent card
+- `POST /skills/classify-urls` - Classify URLs (x402 payment required)
+- `GET /health` - Health check
+
+## Wallet Addresses
+
+| Agent | Address |
+|-------|---------|
+| Scout | `0x269CBA662fE55c4fe1212c609090A31844C36ab8` |
+| Analyst | `0x7ee88871fA9be48b62552F231a4976A11e559db8` |
+
+View on BaseScan: [Scout](https://basescan.org/address/0x269CBA662fE55c4fe1212c609090A31844C36ab8) | [Analyst](https://basescan.org/address/0x7ee88871fA9be48b62552F231a4976A11e559db8)
 
 ## License
 
