@@ -856,9 +856,80 @@ async def classify(
 
 @app.post("/trigger")
 async def trigger_cycle():
-    """Manually trigger one URL processing cycle for debugging"""
-    result = await analyst_agent._process_url()
-    return {"status": "triggered", "result": result}
+    """Manually trigger one URL processing cycle with detailed debugging"""
+    import httpx
+    import uuid
+
+    debug = {"steps": []}
+
+    # Step 1: Check budget
+    try:
+        budget = analyst_agent.x402_client.get_balance()
+        discovery_cost = config.discovery_price_per_url
+        debug["steps"].append({"step": "budget_check", "budget": budget, "cost": discovery_cost})
+
+        if budget < discovery_cost + 0.01:
+            debug["steps"].append({"step": "budget_insufficient", "error": f"Budget {budget} < {discovery_cost + 0.01}"})
+            return {"status": "failed", "debug": debug}
+    except Exception as e:
+        debug["steps"].append({"step": "budget_check", "error": str(e)})
+        return {"status": "failed", "debug": debug}
+
+    # Step 2: Generate spending proof
+    request_id = str(uuid.uuid4())
+    try:
+        spending_proof = await analyst_agent._generate_spending_proof(
+            request_id=request_id,
+            estimated_cost=discovery_cost,
+            budget_remaining=budget
+        )
+        debug["steps"].append({"step": "spending_proof", "decision": spending_proof.get("decision")})
+
+        if spending_proof.get("decision") != "AUTHORIZED":
+            debug["steps"].append({"step": "not_authorized", "decision": spending_proof.get("decision")})
+            return {"status": "failed", "debug": debug}
+    except Exception as e:
+        debug["steps"].append({"step": "spending_proof", "error": str(e)})
+        return {"status": "failed", "debug": debug}
+
+    # Step 3: Self-verify spending proof
+    try:
+        proof_valid, verify_time = await analyst_agent._verify_own_spending_proof(spending_proof)
+        debug["steps"].append({"step": "verify_spending", "valid": proof_valid, "time_ms": verify_time})
+
+        if not proof_valid:
+            return {"status": "failed", "debug": debug}
+    except Exception as e:
+        debug["steps"].append({"step": "verify_spending", "error": str(e)})
+        return {"status": "failed", "debug": debug}
+
+    # Step 4: Call Scout
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{config.scout_url}/skills/discover-url",
+                json={"requester_id": "analyst"}
+            )
+            debug["steps"].append({"step": "scout_call", "status_code": response.status_code})
+
+            if response.status_code != 200:
+                debug["steps"].append({"step": "scout_error", "body": response.text[:500]})
+                return {"status": "failed", "debug": debug}
+
+            discovery = response.json()
+            debug["steps"].append({"step": "scout_response", "url": discovery.get("url", "")[:50]})
+    except Exception as e:
+        debug["steps"].append({"step": "scout_call", "error": str(e)})
+        return {"status": "failed", "debug": debug}
+
+    # Step 5: Run full processing
+    try:
+        result = await analyst_agent._process_url()
+        debug["steps"].append({"step": "process_complete", "result": result})
+        return {"status": "success", "result": result, "debug": debug}
+    except Exception as e:
+        debug["steps"].append({"step": "process_url", "error": str(e)})
+        return {"status": "failed", "debug": debug}
 
 
 @app.post("/extract-features")
