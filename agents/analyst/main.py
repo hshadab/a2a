@@ -167,25 +167,24 @@ class AnalystAgent:
         if self._redis is None:
             try:
                 redis_url = config.redis_url
-                logger.info(f"Connecting to Redis at: {redis_url[:40]}...")
+                logger.info(f"Connecting to Redis at: {redis_url[:50]}...")
 
-                # Handle SSL for rediss:// URLs (Render uses rediss://)
-                import ssl
-                ssl_context = None
+                # For Render's Redis (rediss://), use ssl_cert_reqs=None to skip cert verification
                 if redis_url.startswith("rediss://"):
-                    ssl_context = ssl.create_default_context()
-                    ssl_context.check_hostname = False
-                    ssl_context.verify_mode = ssl.CERT_NONE
+                    self._redis = await redis.from_url(
+                        redis_url,
+                        decode_responses=False,
+                        ssl_cert_reqs=None  # Skip SSL certificate verification
+                    )
+                else:
+                    self._redis = await redis.from_url(redis_url, decode_responses=False)
 
-                self._redis = await redis.from_url(
-                    redis_url,
-                    decode_responses=False,
-                    ssl=ssl_context
-                )
                 await self._redis.ping()
                 logger.info("Connected to Redis for persistence")
             except Exception as e:
                 logger.warning(f"Redis connection failed: {e}. Data will not persist.")
+                import traceback
+                logger.warning(f"Redis traceback: {traceback.format_exc()}")
                 self._redis = None
         return self._redis
 
