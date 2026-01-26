@@ -4,6 +4,30 @@ const ANALYST_URL = process.env.NEXT_PUBLIC_ANALYST_URL || 'http://localhost:800
 // Use Analyst for stats since it's doing the classifications
 const STATS_URL = ANALYST_URL;
 
+// Classification history item
+export interface ClassificationHistoryItem {
+  url: string;
+  domain: string;
+  classification: 'phishing' | 'safe' | 'suspicious';
+  confidence: number;
+  timestamp: string;
+  proof_hash: string;
+  request_id: string;
+}
+
+export interface ClassificationHistory {
+  classifications: ClassificationHistoryItem[];
+  total: number;
+}
+
+export async function getClassificationHistory(limit: number = 50): Promise<ClassificationHistory> {
+  const response = await fetch(`${ANALYST_URL}/history?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch history');
+  }
+  return response.json();
+}
+
 export interface NetworkStats {
   total_urls: number;
   phishing_count: number;

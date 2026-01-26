@@ -139,6 +139,10 @@ class AnalystAgent:
         self.running = False
         self._task = None
 
+        # In-memory history (keeps last 100 classifications)
+        self.recent_classifications: list = []
+        self.max_history = 100
+
     async def initialize(self):
         """Initialize the model commitments"""
         self.model_commitment = classifier_prover.prover.get_model_commitment(
@@ -547,6 +551,21 @@ class AnalystAgent:
         if classification == Classification.PHISHING:
             self.phishing_detected_today += 1
 
+        # Add to history
+        from datetime import datetime
+        self.recent_classifications.append({
+            "url": url,
+            "domain": features.domain,
+            "classification": classification.value,
+            "confidence": confidence,
+            "timestamp": datetime.utcnow().isoformat(),
+            "proof_hash": proof_result.proof_hash,
+            "request_id": request_id
+        })
+        # Keep only last N classifications
+        if len(self.recent_classifications) > self.max_history:
+            self.recent_classifications = self.recent_classifications[-self.max_history:]
+
         logger.info(f"{request_id} classified: {classification.value} (confidence: {confidence:.2f})")
 
         await emit_analyst_response(
@@ -725,6 +744,17 @@ async def stats():
             "running_since": None
         },
         "analyst": analyst_agent.get_stats()
+    }
+
+
+@app.get("/history")
+async def get_history(limit: int = 50):
+    """Get recent classification history"""
+    history = analyst_agent.recent_classifications[-limit:]
+    history.reverse()  # Most recent first
+    return {
+        "classifications": history,
+        "total": len(analyst_agent.recent_classifications)
     }
 
 
