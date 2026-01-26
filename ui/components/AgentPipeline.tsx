@@ -276,7 +276,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           name="Threat Analyst Agent"
           tagline="Classifies URLs with verifiable ML"
           whatItDoes={["Runs phishing classifier on each URL", "Returns: phishing / suspicious / safe"]}
-          whatItProves={["Classification model ran correctly", "Buyer verifies proof before paying"]}
+          whatItProves={["Classification model ran correctly", "Scout verifies proof → pays $0.001 for analyst feedback"]}
           version="2.1.0"
           icon={<Microscope size={20} />}
           state={agentStates.analyst}
@@ -384,7 +384,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           name="URL Scout Agent"
           tagline="Discovers threat URLs from intel feeds"
           whatItDoes={["Fetches URLs from PhishTank & OpenPhish", "Scores source quality with ONNX model"]}
-          whatItProves={["Quality score was computed correctly", "Buyer verifies proof before paying"]}
+          whatItProves={["Quality score was computed correctly", "Analyst verifies proof → pays $0.001 for threat discovery"]}
           version="2.1.0"
           icon={<Search size={20} />}
           state={agentStates.scout}
