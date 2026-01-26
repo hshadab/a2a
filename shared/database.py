@@ -270,31 +270,34 @@ class Database:
             return
 
         try:
-            # Configure SSL based on DATABASE_SSL_MODE
+            # Configure SSL - Render uses SSL by default
+            # The DATABASE_URL may contain ?sslmode=require
             import ssl
-            ssl_mode = config.database_ssl_mode.lower()
 
-            if ssl_mode == "disable":
-                ssl_context = False
-            elif ssl_mode == "require":
-                # Require SSL with full verification
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = True
-                ssl_context.verify_mode = ssl.CERT_REQUIRED
-            else:  # "prefer" (default)
-                # Prefer SSL but accept self-signed certs (for development/Render)
-                ssl_context = ssl.create_default_context()
-                ssl_context.check_hostname = False
-                ssl_context.verify_mode = ssl.CERT_NONE
+            # For Render, always use SSL with no certificate verification
+            # (Render manages the certs internally)
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            # Remove sslmode from URL if present (asyncpg uses ssl parameter instead)
+            db_url = self.database_url
+            if "?" in db_url:
+                base_url, params = db_url.split("?", 1)
+                param_list = [p for p in params.split("&") if not p.startswith("sslmode=")]
+                if param_list:
+                    db_url = base_url + "?" + "&".join(param_list)
+                else:
+                    db_url = base_url
 
             self._pool = await asyncpg.create_pool(
-                self.database_url,
+                db_url,
                 min_size=2,
                 max_size=10,
                 timeout=30,
                 ssl=ssl_context
             )
-            logger.info(f"Connected to PostgreSQL (SSL mode: {ssl_mode})")
+            logger.info(f"Connected to PostgreSQL successfully")
         except Exception as e:
             logger.warning(f"PostgreSQL connection failed: {e}")
             if config.production_mode:
