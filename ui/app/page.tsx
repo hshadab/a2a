@@ -19,7 +19,6 @@ import {
   DollarSign,
   AlertTriangle,
   CheckCircle,
-  Cpu,
 } from 'lucide-react';
 import AgentPipeline from '@/components/AgentPipeline';
 
@@ -147,39 +146,6 @@ export default function Dashboard() {
               <EventRow key={`${event.timestamp}-${i}`} event={event} />
             ))
           )}
-        </div>
-      </section>
-
-      {/* Agent-to-Agent Micro-Economy (2-Agent Model) */}
-      <section className="mt-6 md:mt-8 card p-4 md:p-6 border border-cyan-500/20">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
-            <Cpu className="text-cyan-400" size={18} />
-          </div>
-          <div>
-            <h2 className="text-base md:text-lg font-semibold text-white">Per-URL Circular Economy</h2>
-            <p className="text-xs md:text-sm text-gray-500">Mutual work verification (Net: $0.00)</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-cyan-400" />
-              <span className="text-sm font-medium text-cyan-400">Analyst → Scout ($0.001/URL)</span>
-            </div>
-            <p className="text-xs text-gray-400">
-              Analyst verifies Scout&apos;s quality work proof, then pays for URL discovery.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-400" />
-              <span className="text-sm font-medium text-blue-400">Scout → Analyst ($0.001/URL)</span>
-            </div>
-            <p className="text-xs text-gray-400">
-              Scout verifies Analyst&apos;s classification proof, then pays feedback.
-            </p>
-          </div>
         </div>
       </section>
     </div>

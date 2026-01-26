@@ -42,7 +42,7 @@ body {
 }
 
 .card {
-  @apply bg-[#111111] border border-[#2a2a2a] rounded-lg;
+  @apply bg-[#1a1a1f] border border-[#3a3a45] rounded-lg;
 }
 
 .stat-value {
