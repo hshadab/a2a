@@ -295,7 +295,13 @@ class Database:
             try:
                 logger.info(f"Attempting PostgreSQL connection (attempt {attempt + 1}/{max_retries})...")
 
-                # Render requires SSL - strip sslmode from URL and pass ssl=True
+                # Render requires SSL - create context that skips cert verification
+                import ssl as ssl_module
+                ssl_ctx = ssl_module.create_default_context(ssl_module.Purpose.SERVER_AUTH)
+                ssl_ctx.check_hostname = False
+                ssl_ctx.verify_mode = ssl_module.CERT_NONE
+
+                # Strip sslmode from URL since we handle SSL explicitly
                 db_url = self.database_url
                 if '?sslmode=' in db_url:
                     db_url = db_url.split('?sslmode=')[0]
@@ -305,7 +311,7 @@ class Database:
                     min_size=1,
                     max_size=5,
                     command_timeout=60,
-                    ssl=True,
+                    ssl=ssl_ctx,
                 )
 
                 # Test the connection
