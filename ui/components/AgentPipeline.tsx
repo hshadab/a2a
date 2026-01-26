@@ -273,7 +273,10 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
         {/* Analyst Agent Card */}
         <AgentCard
-          name="Analyst Agent"
+          name="Threat Analyst Agent"
+          tagline="Classifies URLs with verifiable ML"
+          whatItDoes={["Runs phishing classifier on each URL", "Returns: phishing / suspicious / safe"]}
+          whatItProves={["Classification model ran correctly", "Buyer verifies proof before paying"]}
           version="2.1.0"
           icon={<Microscope size={20} />}
           state={agentStates.analyst}
@@ -378,7 +381,10 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 
         {/* Scout Agent Card */}
         <AgentCard
-          name="Scout Agent"
+          name="URL Scout Agent"
+          tagline="Discovers threat URLs from intel feeds"
+          whatItDoes={["Fetches URLs from PhishTank & OpenPhish", "Scores source quality with ONNX model"]}
+          whatItProves={["Quality score was computed correctly", "Buyer verifies proof before paying"]}
           version="2.1.0"
           icon={<Search size={20} />}
           state={agentStates.scout}
@@ -423,6 +429,9 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
 // Agent Card Component
 function AgentCard({
   name,
+  tagline,
+  whatItDoes,
+  whatItProves,
   version,
   icon,
   state,
@@ -437,6 +446,9 @@ function AgentCard({
   color,
 }: {
   name: string;
+  tagline: string;
+  whatItDoes: string[];
+  whatItProves: string[];
   version: string;
   icon: React.ReactNode;
   state: AgentState;
@@ -496,15 +508,7 @@ function AgentCard({
                 <span className="font-semibold text-white">{name}</span>
                 <span className="text-[10px] text-gray-500">v{version}</span>
               </div>
-              <a
-                href={`https://basescan.org/address/${walletAddress}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-gray-500 font-mono hover:text-gray-400 flex items-center gap-1"
-              >
-                {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                <ExternalLink size={10} />
-              </a>
+              <div className="text-xs text-gray-400">{tagline}</div>
             </div>
           </div>
           <div
@@ -520,6 +524,43 @@ function AgentCard({
             />
             {statusText}
           </div>
+        </div>
+        {/* Wallet Link */}
+        <a
+          href={`https://basescan.org/address/${walletAddress}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[10px] text-gray-500 font-mono hover:text-gray-400 flex items-center gap-1 mt-2"
+        >
+          <Wallet size={10} />
+          {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+          <ExternalLink size={10} />
+        </a>
+      </div>
+
+      {/* What It Does */}
+      <div className="px-4 py-3 border-b border-[#2a2a2a]">
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1.5">What It Does</div>
+        <div className="space-y-1">
+          {whatItDoes.map((item, i) => (
+            <div key={i} className="text-xs text-gray-300 flex items-start gap-2">
+              <span className="text-gray-500 mt-0.5">•</span>
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* What It Proves */}
+      <div className="px-4 py-3 border-b border-[#2a2a2a]" style={{ backgroundColor: `${color}05` }}>
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1.5">What It Proves</div>
+        <div className="space-y-1">
+          {whatItProves.map((item, i) => (
+            <div key={i} className="text-xs text-gray-300 flex items-start gap-2">
+              <span style={{ color }} className="mt-0.5">✓</span>
+              <span>{item}</span>
+            </div>
+          ))}
         </div>
       </div>
 
