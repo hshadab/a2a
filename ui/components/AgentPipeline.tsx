@@ -303,7 +303,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           lastProof={lastProof.analyst}
           events={getAgentEvents('analyst')}
           formatEvent={formatEventMessage}
-          color="#22d3ee"
+          color="#a855f7"
         />
 
         {/* Connection Arrows - Desktop: horizontal, Mobile: vertical */}
@@ -344,11 +344,11 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         {/* Mobile Arrows - Vertical between cards */}
         <div className="flex lg:hidden items-center justify-center gap-4 py-2">
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="text-cyan-400">↓</span>
+            <span className="text-purple-400">↓</span>
             <span>Discovery $0.001</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="text-blue-400">↑</span>
+            <span className="text-cyan-400">↑</span>
             <span>Feedback $0.001</span>
           </div>
         </div>
@@ -379,7 +379,7 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           lastProof={lastProof.scout}
           events={getAgentEvents('scout')}
           formatEvent={formatEventMessage}
-          color="#3b82f6"
+          color="#06b6d4"
         />
       </div>
 
