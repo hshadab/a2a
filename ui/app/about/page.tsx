@@ -48,14 +48,14 @@ export default function AboutPage() {
             icon={<Search size={24} />}
             name="Threat Scout"
             role="Discovery + Quality Proof"
-            color="#3b82f6"
+            color="#06b6d4"
             description="Discovers suspicious URLs from PhishTank, OpenPhish, and CT logs. Generates zkML proof that quality scoring ran correctly."
           />
           <AgentBox
             icon={<Microscope size={24} />}
             name="Threat Analyst"
             role="Classification + Work Proof"
-            color="#22d3ee"
+            color="#a855f7"
             description="Classifies URLs as phishing/safe/suspicious using ML. Generates zkML proof that classification model executed correctly."
           />
         </div>
@@ -67,8 +67,8 @@ export default function AboutPage() {
           {/* Desktop: Circular visual */}
           <div className="hidden md:flex items-center justify-center gap-6 text-sm">
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
-                <Search className="text-blue-400" size={28} />
+              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
+                <Search className="text-cyan-400" size={28} />
               </div>
               <span className="text-white font-medium">Scout</span>
               <span className="block text-xs text-gray-500">discovers URL</span>
@@ -81,8 +81,8 @@ export default function AboutPage() {
             </div>
 
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
-                <Microscope className="text-cyan-400" size={28} />
+              <div className="w-20 h-20 rounded-full bg-purple-500/20 border-2 border-purple-500 flex items-center justify-center mb-2">
+                <Microscope className="text-purple-400" size={28} />
               </div>
               <span className="text-white font-medium">Analyst</span>
               <span className="block text-xs text-gray-500">classifies URL</span>
@@ -95,8 +95,8 @@ export default function AboutPage() {
             </div>
 
             <div className="text-center">
-              <div className="w-20 h-20 rounded-full bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center mb-2">
-                <Search className="text-blue-400" size={28} />
+              <div className="w-20 h-20 rounded-full bg-cyan-500/20 border-2 border-cyan-500 flex items-center justify-center mb-2">
+                <Search className="text-cyan-400" size={28} />
               </div>
               <span className="text-white font-medium">Scout</span>
               <span className="block text-xs text-gray-500">receives payment</span>
@@ -105,8 +105,8 @@ export default function AboutPage() {
 
           {/* Mobile: Simplified vertical */}
           <div className="md:hidden space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg">
-              <Search className="text-blue-400" size={20} />
+            <div className="flex items-center gap-3 p-3 bg-cyan-500/10 rounded-lg">
+              <Search className="text-cyan-400" size={20} />
               <div>
                 <span className="text-white text-sm font-medium">Scout discovers URL</span>
                 <span className="block text-xs text-gray-500">generates quality proof</span>
@@ -117,8 +117,8 @@ export default function AboutPage() {
                 <span>↓</span> <span className="font-mono">$0.001</span> <span>↓</span>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-cyan-500/10 rounded-lg">
-              <Microscope className="text-cyan-400" size={20} />
+            <div className="flex items-center gap-3 p-3 bg-purple-500/10 rounded-lg">
+              <Microscope className="text-purple-400" size={20} />
               <div>
                 <span className="text-white text-sm font-medium">Analyst classifies URL</span>
                 <span className="block text-xs text-gray-500">generates work proof</span>
@@ -136,6 +136,9 @@ export default function AboutPage() {
 
           <p className="text-center text-gray-400 text-xs mt-4 font-medium">
             Net per agent: <span className="text-cyan-400">$0.00</span> · Only cost: <span className="text-yellow-400">~$0.002 gas</span>
+          </p>
+          <p className="text-center text-gray-500 text-xs mt-2 italic">
+            While payments net to $0, real wealth is created: a growing database of zkML-verified threat intelligence that protects the internet.
           </p>
         </div>
 
