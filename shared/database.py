@@ -270,39 +270,34 @@ class Database:
             return
 
         try:
-            # Render internal connections: use internal hostname (no -a suffix)
-            # and may not need SSL for internal connections
-            db_url = self.database_url
+            import ssl
 
-            # Try internal hostname first (replace -a.oregon with .oregon for internal)
-            internal_url = db_url.replace('-a.oregon-postgres', '.oregon-postgres')
+            # Create SSL context that doesn't verify certificates
+            ssl_ctx = ssl.create_default_context()
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
 
-            # Remove sslmode from URL for internal connections
-            if '?' in internal_url:
-                internal_url = internal_url.split('?')[0]
+            logger.info(f"Attempting PostgreSQL connection to: {self.database_url[:50]}...")
 
-            logger.info(f"Attempting PostgreSQL connection...")
-
+            # Try single connection first to debug
             try:
-                # Try internal connection without SSL first
-                self._pool = await asyncpg.create_pool(
-                    internal_url,
-                    min_size=1,
-                    max_size=5,
-                    command_timeout=60,
-                )
-                logger.info(f"Connected to PostgreSQL via internal hostname")
-            except Exception as e1:
-                logger.info(f"Internal connection failed ({e1}), trying external with SSL...")
-                # Fall back to external URL with SSL
-                self._pool = await asyncpg.create_pool(
-                    self.database_url.split('?')[0],
-                    min_size=1,
-                    max_size=5,
-                    command_timeout=60,
-                    ssl='require'
-                )
-                logger.info(f"Connected to PostgreSQL via external hostname with SSL")
+                conn = await asyncpg.connect(self.database_url, ssl=ssl_ctx, timeout=30)
+                await conn.close()
+                logger.info("Single connection test passed")
+            except Exception as e:
+                logger.warning(f"Single connection test failed: {e}")
+                self._connection_error = f"single conn: {e}"
+                raise
+
+            # Now create pool
+            self._pool = await asyncpg.create_pool(
+                self.database_url,
+                min_size=1,
+                max_size=5,
+                command_timeout=60,
+                ssl=ssl_ctx
+            )
+            logger.info(f"Connected to PostgreSQL successfully")
         except Exception as e:
             self._connection_error = str(e)
             logger.warning(f"PostgreSQL connection failed: {e}")
