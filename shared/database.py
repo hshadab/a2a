@@ -270,32 +270,14 @@ class Database:
             return
 
         try:
-            # Configure SSL - Render uses SSL by default
-            # The DATABASE_URL may contain ?sslmode=require
-            import ssl
-
-            # For Render, always use SSL with no certificate verification
-            # (Render manages the certs internally)
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-
-            # Remove sslmode from URL if present (asyncpg uses ssl parameter instead)
-            db_url = self.database_url
-            if "?" in db_url:
-                base_url, params = db_url.split("?", 1)
-                param_list = [p for p in params.split("&") if not p.startswith("sslmode=")]
-                if param_list:
-                    db_url = base_url + "?" + "&".join(param_list)
-                else:
-                    db_url = base_url
-
+            # For Render's managed PostgreSQL, use ssl='require' which is simpler
+            # and lets asyncpg handle the SSL negotiation
             self._pool = await asyncpg.create_pool(
-                db_url,
-                min_size=2,
-                max_size=10,
-                timeout=30,
-                ssl=ssl_context
+                self.database_url,
+                min_size=1,
+                max_size=5,
+                command_timeout=60,
+                ssl='require'
             )
             logger.info(f"Connected to PostgreSQL successfully")
         except Exception as e:
