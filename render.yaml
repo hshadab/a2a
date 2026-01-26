@@ -31,6 +31,9 @@ services:
         value: https://threat-intel-analyst.onrender.com
       - key: WEBSOCKET_URL
         value: wss://threat-intel-scout.onrender.com/ws
+      - key: PRODUCTION_MODE
+        value: "true"
+      # Note: PRIVATE_KEY and TREASURY_ADDRESS must be set manually in Render dashboard
     healthCheckPath: /health
 
   # Policy Agent - Authorization with zkML Proofs
@@ -55,6 +58,11 @@ services:
           property: connectionString
       - key: POLICY_URL
         value: https://threat-intel-policy.onrender.com
+      - key: ANALYST_URL
+        value: https://threat-intel-analyst.onrender.com
+      - key: PRODUCTION_MODE
+        value: "true"
+      # Note: PRIVATE_KEY and TREASURY_ADDRESS must be set manually in Render dashboard
     healthCheckPath: /health
 
   # Analyst Agent - URL Classification with zkML Proofs
@@ -79,6 +87,13 @@ services:
           property: connectionString
       - key: ANALYST_URL
         value: https://threat-intel-analyst.onrender.com
+      - key: SCOUT_URL
+        value: https://threat-intel-scout.onrender.com
+      - key: POLICY_URL
+        value: https://threat-intel-policy.onrender.com
+      - key: PRODUCTION_MODE
+        value: "true"
+      # Note: PRIVATE_KEY and TREASURY_ADDRESS must be set manually in Render dashboard
     healthCheckPath: /health
 
   # UI Dashboard - Next.js Frontend
