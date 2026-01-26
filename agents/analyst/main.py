@@ -21,6 +21,7 @@ Mutual Work Verification:
 - Scout verifies Analyst's work proof BEFORE paying feedback
 """
 import asyncio
+import json
 import os
 import time
 from datetime import datetime
@@ -31,6 +32,7 @@ from fastapi import FastAPI, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import redis.asyncio as redis
 
 import sys
 sys.path.append('../..')
@@ -143,8 +145,11 @@ class AnalystAgent:
         self.recent_classifications: list = []
         self.max_history = 100
 
+        # Redis for persistence
+        self._redis: Optional[redis.Redis] = None
+
     async def initialize(self):
-        """Initialize the model commitments"""
+        """Initialize the model commitments and load persisted data"""
         self.model_commitment = classifier_prover.prover.get_model_commitment(
             config.classifier_model_path
         )
@@ -153,6 +158,67 @@ class AnalystAgent:
         )
         logger.info(f"Analyst Agent initialized. Classification model: {self.model_commitment[:16]}...")
         logger.info(f"Spending authorization model: {self.spending_model_commitment[:16]}...")
+
+        # Load persisted data from Redis
+        await self._load_from_redis()
+
+    async def _get_redis(self) -> redis.Redis:
+        """Get or create Redis connection"""
+        if self._redis is None:
+            try:
+                self._redis = await redis.from_url(config.redis_url)
+                await self._redis.ping()
+                logger.info("Connected to Redis for persistence")
+            except Exception as e:
+                logger.warning(f"Redis connection failed: {e}. Data will not persist.")
+                self._redis = None
+        return self._redis
+
+    async def _load_from_redis(self):
+        """Load persisted history and stats from Redis"""
+        try:
+            r = await self._get_redis()
+            if not r:
+                return
+
+            # Load stats
+            stats = await r.hgetall("analyst:stats")
+            if stats:
+                self.classifications_today = int(stats.get(b"total", 0))
+                self.phishing_detected_today = int(stats.get(b"phishing", 0))
+                self.total_spent_usdc = float(stats.get(b"spent_usdc", 0))
+                self.batches_processed = int(stats.get(b"batches", 0))
+                logger.info(f"Loaded stats from Redis: {self.classifications_today} classifications")
+
+            # Load recent classifications
+            history = await r.lrange("analyst:history", 0, self.max_history - 1)
+            if history:
+                self.recent_classifications = [json.loads(item) for item in history]
+                logger.info(f"Loaded {len(self.recent_classifications)} classifications from Redis")
+
+        except Exception as e:
+            logger.warning(f"Failed to load from Redis: {e}")
+
+    async def _save_to_redis(self, classification: dict):
+        """Save classification to Redis"""
+        try:
+            r = await self._get_redis()
+            if not r:
+                return
+
+            # Save to history list (prepend, keep last 100)
+            await r.lpush("analyst:history", json.dumps(classification))
+            await r.ltrim("analyst:history", 0, self.max_history - 1)
+
+            # Update stats
+            await r.hincrby("analyst:stats", "total", 1)
+            if classification.get("classification") == "PHISHING":
+                await r.hincrby("analyst:stats", "phishing", 1)
+            await r.hset("analyst:stats", "spent_usdc", str(self.total_spent_usdc))
+            await r.hset("analyst:stats", "batches", str(self.batches_processed))
+
+        except Exception as e:
+            logger.warning(f"Failed to save to Redis: {e}")
 
     async def _generate_spending_proof(
         self,
@@ -552,8 +618,7 @@ class AnalystAgent:
             self.phishing_detected_today += 1
 
         # Add to history
-        from datetime import datetime
-        self.recent_classifications.append({
+        classification_record = {
             "url": url,
             "domain": features.domain,
             "classification": classification.value,
@@ -561,10 +626,14 @@ class AnalystAgent:
             "timestamp": datetime.utcnow().isoformat(),
             "proof_hash": proof_result.proof_hash,
             "request_id": request_id
-        })
+        }
+        self.recent_classifications.insert(0, classification_record)  # Prepend
         # Keep only last N classifications
         if len(self.recent_classifications) > self.max_history:
-            self.recent_classifications = self.recent_classifications[-self.max_history:]
+            self.recent_classifications = self.recent_classifications[:self.max_history]
+
+        # Persist to Redis
+        await self._save_to_redis(classification_record)
 
         logger.info(f"{request_id} classified: {classification.value} (confidence: {confidence:.2f})")
 

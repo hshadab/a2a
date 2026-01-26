@@ -74,6 +74,10 @@ services:
         value: https://threat-intel-scout.onrender.com
       - key: PRODUCTION_MODE
         value: "true"
+      - key: REDIS_URL
+        fromService:
+          name: threat-intel-redis
+          type: redis
       # Note: PRIVATE_KEY and TREASURY_ADDRESS must be set manually in Render dashboard
     healthCheckPath: /health
 
