@@ -197,7 +197,7 @@ class ScoutAgent:
         logger.info(f"Scout self-authorization: {decision} (confidence: {confidence:.2f})")
 
         await emit_scout_authorized(
-            batch_id=batch_id,
+            request_id=batch_id,
             decision=decision,
             confidence=confidence,
             proof_hash=proof_result.proof_hash,

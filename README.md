@@ -6,7 +6,7 @@ Two autonomous agents continuously build a threat intelligence database by disco
 
 ## Live Demo
 
-- **Dashboard**: https://threat-intel-dashboard.onrender.com
+- **Dashboard**: https://threat-intel-ui.onrender.com
 - **Scout Agent**: https://threat-intel-scout.onrender.com
 - **Analyst Agent**: https://threat-intel-analyst.onrender.com
 

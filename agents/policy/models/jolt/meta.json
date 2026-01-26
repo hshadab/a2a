@@ -1,9 +1,0 @@
-{
-  "model_type": "authorization_classifier",
-  "input_size": 64,
-  "hidden_size": 16,
-  "output_size": 4,
-  "architecture": "64 -> 16 -> 4 MLP",
-  "max_tensor_size": 1024,
-  "prover_compatible": true
-}

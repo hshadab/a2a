@@ -842,6 +842,13 @@ async def classify(
     return await classify_url_endpoint(request, http_request)
 
 
+@app.post("/trigger")
+async def trigger_cycle():
+    """Manually trigger one URL processing cycle for debugging"""
+    result = await analyst_agent._process_url()
+    return {"status": "triggered", "result": result}
+
+
 @app.post("/extract-features")
 async def extract_features_endpoint(url: str) -> Dict[str, Any]:
     """
