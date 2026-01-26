@@ -86,15 +86,15 @@ class ScoutAgent:
 
     def __init__(self):
         # Build sources list based on configuration
-        # Priority order: original discovery first, then aggregation, then synthetic fallback
+        # Priority order: fast feeds first for reliability, then original discovery
         self.sources = [
-            # ORIGINAL DISCOVERY - finds threats before anyone else
-            CertTransparencySource(lookback_days=1),  # New certs impersonating brands
-            TyposquatSource(check_interval_hours=6),  # Proactive typosquat scanning
+            # FAST AGGREGATION FEEDS - quick HTTP fetches, reliable
+            OpenPhishSource(),    # Real phishing URLs (free, single HTTP fetch)
+            URLhausSource(),      # Real malware URLs (free, single HTTP fetch)
 
-            # AGGREGATION - known threat feeds
-            OpenPhishSource(),    # Real phishing URLs (free, no API key)
-            URLhausSource(),      # Real malware URLs (free, no API key)
+            # ORIGINAL DISCOVERY - slower but finds threats before anyone else
+            CertTransparencySource(lookback_days=1),  # New certs (queries 14 patterns - slow)
+            TyposquatSource(check_interval_hours=6),  # Proactive typosquat scanning
         ]
 
         # Add PhishTank source if enabled (uses public data dump, API key optional)
