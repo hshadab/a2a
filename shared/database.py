@@ -287,32 +287,65 @@ class Database:
             await self._in_memory.connect()
             return
 
-        try:
-            logger.info(f"Attempting PostgreSQL connection...")
+        # Retry connection with exponential backoff
+        max_retries = 3
+        retry_delay = 2
 
-            # The DATABASE_URL from Render includes ?sslmode=require
-            # asyncpg handles this automatically when included in the URL
-            # Don't pass ssl parameter separately - let the URL handle it
-            self._pool = await asyncpg.create_pool(
-                self.database_url,
-                min_size=1,
-                max_size=5,
-                command_timeout=60,
-            )
-            logger.info(f"Connected to PostgreSQL successfully")
-        except Exception as e:
-            self._connection_error = str(e)
-            logger.warning(f"PostgreSQL connection failed: {e}")
-            if config.production_mode:
-                # Log warning but allow fallback for debugging
-                logger.warning(
-                    f"Production mode prefers PostgreSQL but connection failed. "
-                    f"Falling back to in-memory for debugging. Check DATABASE_URL configuration."
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Attempting PostgreSQL connection (attempt {attempt + 1}/{max_retries})...")
+
+                # Render requires SSL - asyncpg doesn't parse sslmode from URL
+                # so we must set ssl=True explicitly
+                import ssl
+                ssl_context = ssl.create_default_context()
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
+
+                # Strip sslmode from URL as we're handling SSL separately
+                db_url = self.database_url
+                if '?sslmode=' in db_url:
+                    db_url = db_url.split('?sslmode=')[0]
+                elif '&sslmode=' in db_url:
+                    db_url = db_url.replace('&sslmode=require', '').replace('&sslmode=prefer', '')
+
+                self._pool = await asyncpg.create_pool(
+                    db_url,
+                    min_size=1,
+                    max_size=5,
+                    command_timeout=60,
+                    ssl=ssl_context,
                 )
-            logger.info("Falling back to in-memory storage (DEMO MODE)")
-            self._demo_mode = True
-            self._in_memory = InMemoryDatabase()
-            await self._in_memory.connect()
+
+                # Test the connection
+                async with self._pool.acquire() as conn:
+                    await conn.fetchval('SELECT 1')
+
+                logger.info(f"Connected to PostgreSQL successfully")
+                self._connection_error = None
+
+                # Initialize schema
+                await self.init_schema()
+                return
+
+            except Exception as e:
+                self._connection_error = str(e)
+                logger.warning(f"PostgreSQL connection attempt {attempt + 1} failed: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+
+        # All retries failed - fall back to in-memory
+        logger.error(f"All PostgreSQL connection attempts failed: {self._connection_error}")
+        if config.production_mode:
+            logger.warning(
+                f"Production mode prefers PostgreSQL but connection failed. "
+                f"Falling back to in-memory for debugging. Check DATABASE_URL configuration."
+            )
+        logger.info("Falling back to in-memory storage (DEMO MODE)")
+        self._demo_mode = True
+        self._in_memory = InMemoryDatabase()
+        await self._in_memory.connect()
 
     async def close(self):
         """Close connection pool"""
