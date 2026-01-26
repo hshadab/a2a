@@ -5,12 +5,14 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import {
   getNetworkStats,
   getHealthStatus,
+  getClassificationHistory,
   formatUSDC,
   formatNumber,
   getEventIcon,
   getEventColor,
   NetworkStats,
   HealthStatus,
+  ClassificationHistoryItem,
 } from '@/lib/api';
 import {
   Activity,
@@ -24,22 +26,41 @@ import AgentPipeline from '@/components/AgentPipeline';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws';
 
+// Convert history item to event format for display
+function historyToEvent(item: ClassificationHistoryItem) {
+  return {
+    type: 'HISTORY_CLASSIFICATION',
+    timestamp: item.timestamp,
+    data: {
+      url: item.url,
+      domain: item.domain,
+      classification: item.classification.toUpperCase(),
+      confidence: item.confidence,
+      proof_hash: item.proof_hash,
+      request_id: item.request_id,
+    },
+  };
+}
+
 export default function Dashboard() {
   const { events, isConnected, lastEvent } = useWebSocket(WS_URL);
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [recentHistory, setRecentHistory] = useState<ClassificationHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch initial stats
+  // Fetch initial stats and history
   useEffect(() => {
     async function fetchData() {
       try {
-        const [statsData, healthData] = await Promise.all([
+        const [statsData, healthData, historyData] = await Promise.all([
           getNetworkStats(),
           getHealthStatus(),
+          getClassificationHistory(10),
         ]);
         setStats(statsData);
         setHealth(healthData);
+        setRecentHistory(historyData.classifications || []);
       } catch (e) {
         console.error('Failed to fetch data:', e);
       } finally {
@@ -135,16 +156,25 @@ export default function Dashboard() {
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Activity className="text-cyber-blue" />
           Live Feed
+          {events.length === 0 && recentHistory.length > 0 && (
+            <span className="text-xs text-gray-500 font-normal ml-2">Recent activity</span>
+          )}
         </h2>
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {events.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              Waiting for events...
-            </p>
-          ) : (
+          {events.length > 0 ? (
+            // Show live WebSocket events
             events.map((event, i) => (
               <EventRow key={`${event.timestamp}-${i}`} event={event} />
             ))
+          ) : recentHistory.length > 0 ? (
+            // Show recent history when no live events
+            recentHistory.map((item, i) => (
+              <EventRow key={`history-${item.request_id}-${i}`} event={historyToEvent(item)} />
+            ))
+          ) : (
+            <p className="text-gray-500 text-center py-8">
+              Waiting for events...
+            </p>
           )}
         </div>
       </section>
@@ -193,6 +223,19 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
 
   const getMessage = () => {
     switch (event.type) {
+      case 'HISTORY_CLASSIFICATION':
+        const displayUrl = event.data.url.length > 50 ? event.data.url.slice(0, 47) + '...' : event.data.url;
+        return (
+          <span>
+            <span className={`font-medium ${
+              event.data.classification === 'PHISHING' ? 'text-red-400' :
+              event.data.classification === 'SAFE' ? 'text-green-400' :
+              'text-yellow-400'
+            }`}>{event.data.classification}</span>
+            <span className="text-gray-400"> - </span>
+            <span className="font-mono text-gray-300">{displayUrl}</span>
+          </span>
+        );
       case 'SCOUT_FOUND_URLS':
         return event.data.url_count === 1
           ? `Found URL from ${event.data.source}`

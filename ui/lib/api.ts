@@ -111,6 +111,9 @@ export function formatDuration(startTime: string | null): string {
 
 export function getEventIcon(type: string, data?: Record<string, any>): string {
   switch (type) {
+    case 'HISTORY_CLASSIFICATION':
+      return data?.classification === 'PHISHING' ? '⚠' :
+             data?.classification === 'SAFE' ? '✓' : '?';
     case 'SCOUT_FOUND_URLS':
       return '→';
     case 'SCOUT_AUTHORIZING':
@@ -148,6 +151,9 @@ export function getEventIcon(type: string, data?: Record<string, any>): string {
 
 export function getEventColor(type: string, data?: Record<string, any>): string {
   switch (type) {
+    case 'HISTORY_CLASSIFICATION':
+      return data?.classification === 'PHISHING' ? 'text-red-400' :
+             data?.classification === 'SAFE' ? 'text-green-400' : 'text-yellow-400';
     case 'SCOUT_FOUND_URLS':
       return 'text-blue-400';
     case 'SCOUT_AUTHORIZING':
