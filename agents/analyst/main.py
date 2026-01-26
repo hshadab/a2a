@@ -45,6 +45,8 @@ from shared.events import (
     emit_analyst_authorizing, emit_analyst_authorized, emit_spending_proof_verified,
     emit_analyst_processing, emit_analyst_proving, emit_analyst_response
 )
+from shared.activity import Activity, ActivityCategory, event_to_activity
+from shared.activity_store import activity_store
 from shared.a2a import build_agent_card, build_skill, build_agent_card_v3, build_skill_v3
 from shared.x402 import (
     PaymentRequired, require_payment, get_payment_from_header, X402Client,
@@ -99,6 +101,79 @@ class ClassifyResponse(BaseModel):
     timestamp: str
     # Payment due after proof verification (proof-gated flow)
     payment_due: Optional[PaymentDue] = None
+
+
+# ============ Activity Persister ============
+
+class ActivityPersister:
+    """
+    Listens to Redis pub/sub and persists all events as activities.
+
+    This runs in the background and captures all pipeline events from both
+    Scout and Analyst agents, converting them to Activity records and
+    storing them in Redis for the UI to display.
+    """
+
+    def __init__(self):
+        self._redis: Optional[redis.Redis] = None
+        self._pubsub = None
+        self._running = False
+        self._task: Optional[asyncio.Task] = None
+
+    async def start(self):
+        """Subscribe to threat_intel_events and persist activities."""
+        self._running = True
+        logger.info("ActivityPersister: Starting Redis pub/sub listener")
+
+        try:
+            self._redis = await redis.from_url(config.redis_url, decode_responses=True)
+            self._pubsub = self._redis.pubsub()
+            await self._pubsub.subscribe("threat_intel_events")
+            logger.info("ActivityPersister: Subscribed to threat_intel_events")
+
+            async for message in self._pubsub.listen():
+                if not self._running:
+                    break
+
+                if message["type"] == "message":
+                    try:
+                        event = json.loads(message["data"])
+                        event_type = event.get("type")
+                        event_data = event.get("data", {})
+
+                        # Convert event to activity and save
+                        activity = event_to_activity(event_type, event_data)
+                        await activity_store.save(activity)
+                        logger.debug(f"ActivityPersister: Saved activity {activity.event_type}")
+                    except Exception as e:
+                        logger.warning(f"ActivityPersister: Failed to process event: {e}")
+
+        except Exception as e:
+            logger.error(f"ActivityPersister: Error in pub/sub listener: {e}")
+        finally:
+            await self.stop()
+
+    async def stop(self):
+        """Stop the persister and clean up."""
+        self._running = False
+        logger.info("ActivityPersister: Stopping")
+
+        if self._pubsub:
+            try:
+                await self._pubsub.unsubscribe("threat_intel_events")
+                await self._pubsub.close()
+            except Exception:
+                pass
+
+        if self._redis:
+            try:
+                await self._redis.close()
+            except Exception:
+                pass
+
+
+# Global activity persister instance
+activity_persister = ActivityPersister()
 
 
 # ============ Analyst Agent (2-Agent Model) ============
@@ -712,8 +787,12 @@ async def lifespan(app: FastAPI):
     # Analyst is now the customer who drives the pipeline
     asyncio.create_task(analyst_agent.start())
 
+    # Start the activity persister to capture all events
+    asyncio.create_task(activity_persister.start())
+
     yield
     # Shutdown
+    await activity_persister.stop()
     await analyst_agent.stop()
     await db.close()
 
@@ -832,6 +911,44 @@ async def get_history(limit: int = 50):
     return {
         "classifications": history,
         "total": len(analyst_agent.recent_classifications)
+    }
+
+
+@app.get("/activities")
+async def get_activities(
+    limit: int = 50,
+    category: Optional[str] = None
+) -> dict:
+    """
+    Get activity history with optional category filter.
+
+    Categories: discovery, authorization, classification, payment, verification, error
+    """
+    activities = await activity_store.list(limit=limit, category=category)
+    total = await activity_store.count()
+
+    return {
+        "activities": [a.model_dump() for a in activities],
+        "total": total,
+        "filtered_count": len(activities)
+    }
+
+
+@app.get("/activities/payments")
+async def get_payment_activities(limit: int = 50) -> dict:
+    """
+    Get payment activities with blockchain explorer links.
+
+    Returns payment activities including transaction hashes and Basescan URLs.
+    """
+    payments = await activity_store.get_payments(limit=limit)
+    total_usdc = sum(p.amount_usdc or 0 for p in payments)
+    count = await activity_store.count_payments()
+
+    return {
+        "payments": [p.model_dump() for p in payments],
+        "total_usdc": total_usdc,
+        "count": count
     }
 
 

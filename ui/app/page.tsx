@@ -6,13 +6,17 @@ import {
   getNetworkStats,
   getHealthStatus,
   getClassificationHistory,
+  getActivities,
   formatUSDC,
   formatNumber,
   getEventIcon,
   getEventColor,
+  getActivityIcon,
+  getActivityColor,
   NetworkStats,
   HealthStatus,
   ClassificationHistoryItem,
+  Activity as ActivityType,
 } from '@/lib/api';
 import {
   Activity,
@@ -47,20 +51,23 @@ export default function Dashboard() {
   const [stats, setStats] = useState<NetworkStats | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [recentHistory, setRecentHistory] = useState<ClassificationHistoryItem[]>([]);
+  const [recentActivities, setRecentActivities] = useState<ActivityType[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch initial stats and history
+  // Fetch initial stats, history, and activities
   useEffect(() => {
     async function fetchData() {
       try {
-        const [statsData, healthData, historyData] = await Promise.all([
+        const [statsData, healthData, historyData, activitiesData] = await Promise.all([
           getNetworkStats(),
           getHealthStatus(),
           getClassificationHistory(10),
+          getActivities(15),  // Get more activities for the feed
         ]);
         setStats(statsData);
         setHealth(healthData);
         setRecentHistory(historyData.classifications || []);
+        setRecentActivities(activitiesData.activities || []);
       } catch (e) {
         console.error('Failed to fetch data:', e);
       } finally {
@@ -156,7 +163,7 @@ export default function Dashboard() {
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Activity className="text-cyber-blue" />
           Live Feed
-          {events.length === 0 && recentHistory.length > 0 && (
+          {events.length === 0 && (recentActivities.length > 0 || recentHistory.length > 0) && (
             <span className="text-xs text-gray-500 font-normal ml-2">Recent activity</span>
           )}
         </h2>
@@ -166,8 +173,13 @@ export default function Dashboard() {
             events.map((event, i) => (
               <EventRow key={`${event.timestamp}-${i}`} event={event} />
             ))
+          ) : recentActivities.length > 0 ? (
+            // Show persisted activities from API
+            recentActivities.map((activity) => (
+              <ActivityRow key={activity.id} activity={activity} />
+            ))
           ) : recentHistory.length > 0 ? (
-            // Show recent history when no live events
+            // Fallback to recent history when no activities
             recentHistory.map((item, i) => (
               <EventRow key={`history-${item.request_id}-${i}`} event={historyToEvent(item)} />
             ))
@@ -212,6 +224,48 @@ function StatCard({
         )}
       </div>
       {subtext && <p className="text-[10px] md:text-xs text-gray-500 mt-1">{subtext}</p>}
+    </div>
+  );
+}
+
+function ActivityRow({ activity }: { activity: ActivityType }) {
+  const time = new Date(activity.timestamp).toLocaleTimeString();
+  const icon = getActivityIcon(activity);
+  const color = getActivityColor(activity);
+
+  return (
+    <div className={`text-xs md:text-sm py-2 border-b border-gray-800/50 animate-slide-in ${color}`}>
+      <div className="flex items-start gap-2 md:gap-3">
+        <span className="text-gray-500 w-14 md:w-20 flex-shrink-0 text-[10px] md:text-sm">{time}</span>
+        <span className="w-4 md:w-6">{icon}</span>
+        <div className="flex-1">
+          <span className="font-medium">{activity.title}</span>
+          <span className="text-gray-400"> - {activity.description}</span>
+          {/* Show payment link if available */}
+          {activity.explorer_url && (
+            <a
+              href={activity.explorer_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-2 text-xs text-blue-400 hover:text-blue-300 inline-flex items-center gap-1"
+            >
+              View on Basescan
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          )}
+          {/* Show URL for classification activities */}
+          {activity.url && (
+            <div className="text-xs text-gray-500 font-mono mt-0.5 truncate">
+              {activity.url.length > 60 ? activity.url.slice(0, 57) + '...' : activity.url}
+            </div>
+          )}
+        </div>
+        <span className="hidden md:inline text-gray-600 text-xs px-1.5 py-0.5 bg-gray-800/50 rounded">
+          {activity.agent}
+        </span>
+      </div>
     </div>
   );
 }

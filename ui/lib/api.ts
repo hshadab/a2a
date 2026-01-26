@@ -20,10 +20,64 @@ export interface ClassificationHistory {
   total: number;
 }
 
+// Activity tracking types
+export interface Activity {
+  id: string;
+  request_id: string;
+  event_type: string;
+  category: 'discovery' | 'authorization' | 'classification' | 'payment' | 'verification' | 'error';
+  timestamp: string;
+  agent: string;
+  title: string;
+  description: string;
+  data: Record<string, any>;
+  // Payment fields
+  tx_hash?: string;
+  amount_usdc?: number;
+  explorer_url?: string;
+  // Proof fields
+  proof_hash?: string;
+  prove_time_ms?: number;
+  // Classification fields
+  url?: string;
+  classification?: string;
+  confidence?: number;
+}
+
+export interface ActivityListResponse {
+  activities: Activity[];
+  total: number;
+  filtered_count: number;
+}
+
+export interface PaymentActivityResponse {
+  payments: Activity[];
+  total_usdc: number;
+  count: number;
+}
+
 export async function getClassificationHistory(limit: number = 50): Promise<ClassificationHistory> {
   const response = await fetch(`${ANALYST_URL}/history?limit=${limit}`);
   if (!response.ok) {
     throw new Error('Failed to fetch history');
+  }
+  return response.json();
+}
+
+export async function getActivities(limit: number = 50, category?: string): Promise<ActivityListResponse> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (category) params.append('category', category);
+  const response = await fetch(`${ANALYST_URL}/activities?${params}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch activities');
+  }
+  return response.json();
+}
+
+export async function getPaymentActivities(limit: number = 50): Promise<PaymentActivityResponse> {
+  const response = await fetch(`${ANALYST_URL}/activities/payments?limit=${limit}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch payment activities');
   }
   return response.json();
 }
@@ -183,6 +237,88 @@ export function getEventColor(type: string, data?: Record<string, any>): string 
       return 'text-red-400';
     default:
       return 'text-gray-400';
+  }
+}
+
+// Activity-based display helpers
+export function getActivityIcon(activity: Activity): string {
+  switch (activity.category) {
+    case 'discovery':
+      return '→';
+    case 'authorization':
+      return activity.event_type.includes('AUTHORIZING') ? '○' : '●';
+    case 'verification':
+      return activity.data?.valid === false ? '✗' : '✓';
+    case 'payment':
+      return '$';
+    case 'classification':
+      if (activity.classification === 'PHISHING') return '⚠';
+      if (activity.classification === 'SAFE') return '✓';
+      if (activity.event_type === 'ANALYST_PROVING') return '◐';
+      return '◎';
+    case 'error':
+      return '✗';
+    default:
+      return '•';
+  }
+}
+
+export function getActivityColor(activity: Activity): string {
+  switch (activity.category) {
+    case 'discovery':
+      return 'text-blue-400';
+    case 'authorization':
+      return activity.event_type.includes('AUTHORIZED') ? 'text-green-400' : 'text-blue-400';
+    case 'verification':
+      return activity.data?.valid === false ? 'text-red-400' : 'text-green-400';
+    case 'payment':
+      return 'text-yellow-400';
+    case 'classification':
+      if (activity.classification === 'PHISHING') return 'text-red-400';
+      if (activity.classification === 'SAFE') return 'text-green-400';
+      return 'text-cyan-400';
+    case 'error':
+      return 'text-red-400';
+    default:
+      return 'text-gray-400';
+  }
+}
+
+export function getCategoryIcon(category: string): string {
+  switch (category) {
+    case 'discovery':
+      return '→';
+    case 'authorization':
+      return '●';
+    case 'verification':
+      return '✓';
+    case 'payment':
+      return '$';
+    case 'classification':
+      return '◎';
+    case 'error':
+      return '✗';
+    default:
+      return '•';
+  }
+}
+
+export function getCategoryColor(category: string): string {
+  switch (category) {
+    case 'discovery':
+      return 'text-blue-400 bg-blue-500/10 border-blue-500/30';
+    case 'authorization':
+      return 'text-purple-400 bg-purple-500/10 border-purple-500/30';
+    case 'verification':
+      return 'text-green-400 bg-green-500/10 border-green-500/30';
+    case 'payment':
+      return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30';
+    case 'classification':
+      return 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30';
+    case 'error':
+      return 'text-red-400 bg-red-500/10 border-red-500/30';
+    default:
+      return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
   }
 }
 
