@@ -1,11 +1,18 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Activity, Shield, Zap, DollarSign, ArrowRight, Search, Scale, Microscope, Coins, Check, X } from 'lucide-react';
+import { Activity, Shield, Zap, DollarSign, ArrowRight, Search, Scale, Microscope, Coins, Check, X, Wallet } from 'lucide-react';
 import ProofCard from './ProofCard';
 import VerificationChecklist from './VerificationChecklist';
 
 type AgentState = 'idle' | 'active' | 'working' | 'proving';
+
+// Agent wallet addresses
+const WALLET_ADDRESSES = {
+  analyst: '0x7ee88871fA9be48b62552F231a4976A11e559db8',
+  scout: '0x269CBA662fE55c4fe1212c609090A31844C36ab8',
+  policy: '0x58e12462395F9056a60bf4Db4E540C4984dA27be',
+};
 
 interface ProofStage {
   name: string;
@@ -56,6 +63,58 @@ interface AgentPipelineProps {
 export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelineProps) {
   const [particles, setParticles] = useState<{ id: number; from: string; to: string }[]>([]);
   const [proofProgress, setProofProgress] = useState<{ policy: number; analyst: number }>({ policy: 0, analyst: 0 });
+  const [walletBalances, setWalletBalances] = useState<Record<string, { usdc: number; eth: number }>>({});
+
+  // Fetch wallet balances
+  useEffect(() => {
+    const fetchBalances = async () => {
+      const balances: Record<string, { usdc: number; eth: number }> = {};
+      const usdcContract = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+      const balanceOfSelector = '0x70a08231';
+
+      for (const [agent, address] of Object.entries(WALLET_ADDRESSES)) {
+        try {
+          // Fetch ETH balance
+          const ethResp = await fetch('https://mainnet.base.org', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_getBalance',
+              params: [address, 'latest'],
+              id: 1,
+            }),
+          });
+          const ethData = await ethResp.json();
+          const ethBalance = parseInt(ethData.result, 16) / 1e18;
+
+          // Fetch USDC balance
+          const paddedAddress = address.slice(2).toLowerCase().padStart(64, '0');
+          const usdcResp = await fetch('https://mainnet.base.org', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'eth_call',
+              params: [{ to: usdcContract, data: balanceOfSelector + paddedAddress }, 'latest'],
+              id: 2,
+            }),
+          });
+          const usdcData = await usdcResp.json();
+          const usdcBalance = parseInt(usdcData.result, 16) / 1e6;
+
+          balances[agent] = { usdc: usdcBalance, eth: ethBalance };
+        } catch (e) {
+          balances[agent] = { usdc: 0, eth: 0 };
+        }
+      }
+      setWalletBalances(balances);
+    };
+
+    fetchBalances();
+    const interval = setInterval(fetchBalances, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Track proof state for each agent
   const [policyProof, setPolicyProof] = useState<ProofData | null>(null);
@@ -290,10 +349,34 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
             </filter>
           </defs>
 
-          {/* Connection: Scout to Policy - Top arrow (request) */}
+          {/* Connection: Analyst to Scout - Payment flow (Analyst pays Scout) */}
           <line
             x1="26" y1="42"
             x2="40" y2="42"
+            stroke={activeFlow === 'analyst-scout' ? '#fbbf24' : '#22d3ee'}
+            strokeWidth="0.4"
+            strokeOpacity={activeFlow === 'analyst-scout' ? 1 : 0.6}
+            markerEnd={activeFlow === 'analyst-scout' ? 'url(#arrowRightActive)' : 'url(#arrowRight)'}
+            className={activeFlow === 'analyst-scout' ? '' : 'flow-line'}
+            filter={activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
+          />
+          {/* Scout to Analyst - Response with URLs */}
+          <line
+            x1="40" y1="48"
+            x2="26" y2="48"
+            stroke={activeFlow === 'scout-analyst' ? '#22d3ee' : '#22d3ee'}
+            strokeWidth="0.4"
+            strokeOpacity={activeFlow === 'scout-analyst' ? 1 : 0.4}
+            markerEnd="url(#arrowLeft)"
+            className={activeFlow === 'scout-analyst' ? '' : 'flow-line'}
+            style={{ animationDirection: 'reverse' }}
+            filter={activeFlow === 'scout-analyst' ? 'url(#glow)' : 'none'}
+          />
+
+          {/* Connection: Scout to Policy - Payment flow (Scout pays Policy) */}
+          <line
+            x1="60" y1="42"
+            x2="74" y2="42"
             stroke={activeFlow === 'scout-policy' ? '#fbbf24' : '#3b82f6'}
             strokeWidth="0.4"
             strokeOpacity={activeFlow === 'scout-policy' ? 1 : 0.6}
@@ -301,41 +384,17 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
             className={activeFlow === 'scout-policy' ? '' : 'flow-line'}
             filter={activeFlow === 'scout-policy' ? 'url(#glow)' : 'none'}
           />
-          {/* Scout to Policy - Bottom arrow (response) */}
+          {/* Policy to Scout - Authorization response */}
           <line
-            x1="40" y1="48"
-            x2="26" y2="48"
+            x1="74" y1="48"
+            x2="60" y2="48"
             stroke={activeFlow === 'policy-scout' ? '#22d3ee' : '#3b82f6'}
             strokeWidth="0.4"
             strokeOpacity={activeFlow === 'policy-scout' ? 1 : 0.4}
             markerEnd="url(#arrowLeft)"
             className={activeFlow === 'policy-scout' ? '' : 'flow-line'}
-            style={{ animationDirection: 'reverse' }}
-            filter={activeFlow === 'policy-scout' ? 'url(#glow)' : 'none'}
-          />
-
-          {/* Connection: Policy to Analyst - Top arrow (request) */}
-          <line
-            x1="60" y1="42"
-            x2="74" y2="42"
-            stroke={activeFlow === 'policy-analyst' ? '#fbbf24' : '#a855f7'}
-            strokeWidth="0.4"
-            strokeOpacity={activeFlow === 'policy-analyst' ? 1 : 0.6}
-            markerEnd={activeFlow === 'policy-analyst' ? 'url(#arrowRightActive)' : 'url(#arrowRight)'}
-            className={activeFlow === 'policy-analyst' ? '' : 'flow-line'}
-            filter={activeFlow === 'policy-analyst' ? 'url(#glow)' : 'none'}
-          />
-          {/* Policy to Analyst - Bottom arrow (response) */}
-          <line
-            x1="74" y1="48"
-            x2="60" y2="48"
-            stroke={activeFlow === 'analyst-scout' ? '#22d3ee' : '#a855f7'}
-            strokeWidth="0.4"
-            strokeOpacity={activeFlow === 'analyst-scout' ? 1 : 0.4}
-            markerEnd="url(#arrowLeft)"
-            className={activeFlow === 'analyst-scout' ? '' : 'flow-line'}
             style={{ animationDirection: 'reverse', animationDelay: '0.5s' }}
-            filter={activeFlow === 'analyst-scout' ? 'url(#glow)' : 'none'}
+            filter={activeFlow === 'policy-scout' ? 'url(#glow)' : 'none'}
           />
 
         </svg>
@@ -353,39 +412,61 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
         )}
 
         {/* Flow Label Annotations */}
-        {activeFlow === 'scout-policy' && (
+        {activeFlow === 'analyst-scout' && (
           <div className="absolute top-4 left-[30%] z-10">
             <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
-              Auth Request
+              $0.001 + Discovery Request
+            </span>
+          </div>
+        )}
+        {activeFlow === 'scout-analyst' && (
+          <div className="absolute top-4 left-[30%] z-10">
+            <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
+              URLs + Auth Proof
+            </span>
+          </div>
+        )}
+        {activeFlow === 'scout-policy' && (
+          <div className="absolute top-4 left-[65%] z-10">
+            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
+              $0.001 + Auth Request
             </span>
           </div>
         )}
         {activeFlow === 'policy-scout' && (
-          <div className="absolute top-4 left-[30%] z-10">
+          <div className="absolute top-4 left-[65%] z-10">
             <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
               Authorized + Proof
             </span>
           </div>
         )}
-        {activeFlow === 'policy-analyst' && (
-          <div className="absolute top-4 left-[65%] z-10">
-            <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded animate-pulse">
-              Classify URLs
-            </span>
-          </div>
-        )}
-        {activeFlow === 'analyst-scout' && (
-          <div className="absolute top-4 left-[65%] z-10">
-            <span className="text-xs text-cyan-400 bg-cyan-400/10 px-2 py-1 rounded animate-pulse">
-              Results + Proof
-            </span>
-          </div>
-        )}
 
-        {/* Scout Agent */}
+        {/* Analyst Agent - Pays Scout first in the value chain */}
         <AgentCard
-          name="Threat Scout"
-          role="URL Discovery"
+          name="Threat Analysis Agent"
+          role="Proof of Correct Analysis"
+          icon={<Microscope size={24} />}
+          color="cyan"
+          colorHex="#22d3ee"
+          state={agentStates.analyst}
+          proofProgress={agentStates.analyst === 'proving' ? proofProgress.analyst : 0}
+          stats={[
+            { label: 'Phishing', value: stats?.phishing_count?.toLocaleString() || '0' },
+            { label: 'Earned', value: `$${(stats?.analyst_paid_usdc || 0).toFixed(3)}` },
+          ]}
+          events={getAgentEvents('analyst')}
+          formatEvent={formatEventMessage}
+          walletBalance={walletBalances.analyst}
+          walletAddress={WALLET_ADDRESSES.analyst}
+        />
+
+        {/* Spacer for SVG lines */}
+        <div className="w-16" />
+
+        {/* Scout Agent - Receives from Analyst, pays Policy */}
+        <AgentCard
+          name="Scout Agent"
+          role="Potential Threat Discovery"
           icon={<Search size={24} />}
           color="blue"
           colorHex="#3b82f6"
@@ -397,14 +478,16 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           ]}
           events={getAgentEvents('scout')}
           formatEvent={formatEventMessage}
+          walletBalance={walletBalances.scout}
+          walletAddress={WALLET_ADDRESSES.scout}
         />
 
         {/* Spacer for SVG lines */}
         <div className="w-16" />
 
-        {/* Policy Agent */}
+        {/* Policy Agent - Receives from Scout, pays Analyst (completes circle) */}
         <AgentCard
-          name="Spending Approval"
+          name="Spending Approval Agent"
           role="Proof of Correct Approval"
           icon={<Scale size={24} />}
           color="purple"
@@ -417,26 +500,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           ]}
           events={getAgentEvents('policy')}
           formatEvent={formatEventMessage}
-        />
-
-        {/* Spacer for SVG lines */}
-        <div className="w-16" />
-
-        {/* Analyst Agent */}
-        <AgentCard
-          name="URL Classifier"
-          role="Proof of Analysis"
-          icon={<Microscope size={24} />}
-          color="cyan"
-          colorHex="#22d3ee"
-          state={agentStates.analyst}
-          proofProgress={agentStates.analyst === 'proving' ? proofProgress.analyst : 0}
-          stats={[
-            { label: 'Phishing', value: stats?.phishing_count?.toLocaleString() || '0' },
-            { label: 'Earned', value: `$${(stats?.analyst_paid_usdc || 0).toFixed(3)}` },
-          ]}
-          events={getAgentEvents('analyst')}
-          formatEvent={formatEventMessage}
+          walletBalance={walletBalances.policy}
+          walletAddress={WALLET_ADDRESSES.policy}
         />
       </div>
 
@@ -520,6 +585,8 @@ function AgentCard({
   stats,
   events,
   formatEvent,
+  walletBalance,
+  walletAddress,
 }: {
   name: string;
   role: string;
@@ -531,6 +598,8 @@ function AgentCard({
   stats: { label: string; value: string }[];
   events: AgentEvent[];
   formatEvent: (e: AgentEvent) => string;
+  walletBalance?: { usdc: number; eth: number };
+  walletAddress?: string;
 }) {
   const isActive = state !== 'idle';
   const isProving = state === 'proving';
@@ -668,6 +737,28 @@ function AgentCard({
           </div>
         </div>
       </div>
+
+      {/* Wallet Balance */}
+      {walletBalance && (
+        <div className="px-4 py-2 border-b border-gray-800 bg-gray-800/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Wallet size={12} className="text-gray-500" />
+              <span className="text-xs text-gray-500 font-mono">
+                {walletAddress ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-green-400 font-mono font-medium">
+                ${walletBalance.usdc.toFixed(2)} USDC
+              </span>
+              <span className="text-blue-400 font-mono">
+                {walletBalance.eth.toFixed(4)} ETH
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="p-4 border-b border-gray-800">
