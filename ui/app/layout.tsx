@@ -4,7 +4,20 @@ import Navigation from '@/components/Navigation'
 
 export const metadata: Metadata = {
   title: 'ThreatProof - Verifiable Threat Intelligence',
-  description: 'Autonomous threat intelligence with zkML-verified classifications using A2A, x402, and Jolt Atlas',
+  description: 'Autonomous Agent-to-Agent commerce secured by zkML. Agents discover and classify phishing threats with cryptographic proofs of correct work.',
+  metadataBase: new URL('https://www.threatproof.ai'),
+  openGraph: {
+    title: 'ThreatProof - Verifiable Threat Intelligence',
+    description: 'Autonomous Agent-to-Agent commerce secured by zkML. Powered by Google A2A, x402, and Jolt Atlas.',
+    url: 'https://www.threatproof.ai',
+    siteName: 'ThreatProof',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ThreatProof - Verifiable Threat Intelligence',
+    description: 'Autonomous Agent-to-Agent commerce secured by zkML.',
+  },
 }
 
 export default function RootLayout({
