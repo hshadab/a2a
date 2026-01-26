@@ -295,21 +295,17 @@ class Database:
             try:
                 logger.info(f"Attempting PostgreSQL connection (attempt {attempt + 1}/{max_retries})...")
 
-                # Render requires SSL - asyncpg doesn't parse sslmode from URL
-                # Use ssl='require' which is the simplest approach
-                # Strip sslmode from URL as we're handling SSL separately
+                # Render requires SSL - strip sslmode from URL and pass ssl=True
                 db_url = self.database_url
                 if '?sslmode=' in db_url:
                     db_url = db_url.split('?sslmode=')[0]
-                elif '&sslmode=' in db_url:
-                    db_url = db_url.replace('&sslmode=require', '').replace('&sslmode=prefer', '')
 
                 self._pool = await asyncpg.create_pool(
                     db_url,
                     min_size=1,
                     max_size=5,
                     command_timeout=60,
-                    ssl='require',
+                    ssl=True,
                 )
 
                 # Test the connection
@@ -324,9 +320,10 @@ class Database:
                 return
 
             except Exception as e:
-                self._connection_error = str(e)
+                self._connection_error = f"Attempt {attempt + 1}/{max_retries}: {str(e)}"
                 logger.warning(f"PostgreSQL connection attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
+                    logger.info(f"Retrying in {retry_delay}s...")
                     await asyncio.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
 
