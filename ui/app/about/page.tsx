@@ -138,7 +138,7 @@ export default function AboutPage() {
             Net per agent: <span className="text-cyan-400">$0.00</span> · Only cost: <span className="text-yellow-400">~$0.002 gas</span>
           </p>
           <p className="text-center text-gray-500 text-xs mt-2 italic">
-            While payments net to $0, real wealth is created: a growing database of zkML-verified threat intelligence that protects the internet.
+            Real wealth is created: a growing database of <a href="https://github.com/ICME-Lab/jolt-atlas" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300">Jolt Atlas</a> zkML-verified threat intelligence that protects the internet.
           </p>
         </div>
 
@@ -153,8 +153,15 @@ export default function AboutPage() {
               <div className="flex items-start gap-2">
                 <Check className="text-green-400 mt-0.5 flex-shrink-0" size={16} />
                 <div>
-                  <span className="text-white font-medium">Work Proofs</span>
-                  <p className="text-gray-500 text-xs">Each agent proves their ML model ran correctly on the input</p>
+                  <span className="text-white font-medium">Scout Work Proofs</span>
+                  <p className="text-gray-500 text-xs">Scout proves URL quality scoring ran correctly via zkML proof</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Check className="text-green-400 mt-0.5 flex-shrink-0" size={16} />
+                <div>
+                  <span className="text-white font-medium">Analyst Work Proofs</span>
+                  <p className="text-gray-500 text-xs">Analyst proves classification model ran correctly via zkML proof</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">

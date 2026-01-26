@@ -511,10 +511,10 @@ function AgentCard({
 
   return (
     <div
-      className="w-full lg:flex-1 lg:max-w-md rounded-xl border transition-all duration-300"
+      className="w-full lg:flex-1 lg:max-w-md rounded-xl border-2 transition-all duration-300"
       style={{
-        borderColor: isActive ? color : `${color}30`,
-        boxShadow: isProving ? `0 0 24px ${color}50` : `0 0 0 1px ${color}10`,
+        borderColor: isActive ? color : `${color}60`,
+        boxShadow: isProving ? `0 0 24px ${color}50, inset 0 0 20px ${color}10` : `0 0 0 1px ${color}20, 0 4px 20px rgba(0,0,0,0.3)`,
         background: `linear-gradient(135deg, ${color}08 0%, #0f0f12 50%, #0a0a0f 100%)`,
       }}
     >

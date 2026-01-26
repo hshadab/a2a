@@ -53,10 +53,6 @@ export default function Navigation() {
               <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
               <span className="text-sm text-green-400 font-medium">Live</span>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
-              <Cpu size={14} className="text-cyan-400" />
-              <span className="text-sm text-cyan-400 font-medium">Autonomous</span>
-            </div>
             <div className="flex items-center gap-2 ml-3">
               {tabs.map((tab) => {
                 const isActive = pathname === tab.href;
@@ -125,9 +121,9 @@ export default function Navigation() {
           </div>
         )}
 
-        {/* Tagline - left aligned, closer to nav */}
-        <div className="flex items-center justify-start h-6 md:h-7 -mt-1">
-          <div className="flex flex-row items-center gap-2 text-xs md:text-sm text-gray-400">
+        {/* Tagline - larger and closer to title */}
+        <div className="flex items-center justify-start h-8 md:h-9 -mt-2">
+          <div className="flex flex-row items-center gap-2 text-sm md:text-base text-gray-400">
             <span className="text-cyan-400 font-medium">Autonomous Agent-to-Agent commerce</span>
             <span className="text-gray-600">•</span>
             <span>zkML proofs verify correct work and spending guardrails</span>
