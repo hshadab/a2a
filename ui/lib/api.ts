@@ -49,7 +49,8 @@ export async function triggerBatch(): Promise<{ batch_id: string | null }> {
   return response.json();
 }
 
-export function formatUSDC(amount: number): string {
+export function formatUSDC(amount: number | null | undefined): string {
+  if (amount == null || isNaN(amount)) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -58,7 +59,8 @@ export function formatUSDC(amount: number): string {
   }).format(amount);
 }
 
-export function formatNumber(num: number): string {
+export function formatNumber(num: number | null | undefined): string {
+  if (num == null || isNaN(num)) return '0';
   return new Intl.NumberFormat('en-US').format(num);
 }
 
