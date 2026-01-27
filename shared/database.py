@@ -335,16 +335,29 @@ class Database:
             try:
                 logger.info(f"Attempting PostgreSQL connection with psycopg (attempt {attempt + 1}/{max_retries})...")
 
-                # psycopg handles SSL from the connection string automatically
+                # First try a direct connection to verify connectivity
+                logger.info("Testing direct psycopg connection...")
+                async with await psycopg.AsyncConnection.connect(
+                    self.database_url,
+                    connect_timeout=30,
+                ) as test_conn:
+                    async with test_conn.cursor() as cur:
+                        await cur.execute('SELECT version()')
+                        result = await cur.fetchone()
+                        logger.info(f"Direct connection successful: {result[0][:50]}...")
+
+                # Direct connection worked, now create pool
+                logger.info("Creating connection pool...")
                 self._psycopg_pool = AsyncConnectionPool(
                     self.database_url,
                     min_size=1,
                     max_size=3,
-                    open=False,  # Don't open immediately
+                    open=False,
+                    timeout=60,  # Longer timeout for pool operations
                 )
-                await self._psycopg_pool.open()
+                await self._psycopg_pool.open(wait=True, timeout=60)
 
-                # Test the connection
+                # Test the pool
                 async with self._psycopg_pool.connection() as conn:
                     async with conn.cursor() as cur:
                         await cur.execute('SELECT 1')
