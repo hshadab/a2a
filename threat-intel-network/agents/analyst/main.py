@@ -43,7 +43,8 @@ from shared.database import db
 from shared.events import (
     broadcaster,
     emit_analyst_authorizing, emit_analyst_authorized, emit_spending_proof_verified,
-    emit_analyst_processing, emit_analyst_proving, emit_analyst_response
+    emit_analyst_processing, emit_analyst_proving, emit_analyst_response,
+    emit_payment_sending, emit_payment_sent
 )
 from shared.activity import Activity, ActivityCategory, event_to_activity
 from shared.activity_store import activity_store
@@ -552,6 +553,7 @@ class AnalystAgent:
         payment_amount = payment_due.get("amount", discovery_cost)
 
         try:
+            await emit_payment_sending(request_id, payment_amount, payment_due.get("recipient", config.treasury_address))
             receipt = await self.x402_client.make_payment(
                 recipient=payment_due.get("recipient", config.treasury_address),
                 amount_usdc=payment_amount,
@@ -559,6 +561,7 @@ class AnalystAgent:
             )
             tx_hash = receipt.tx_hash if receipt else "simulated"
             self.total_spent_usdc += payment_amount
+            await emit_payment_sent(request_id, tx_hash, payment_amount)
             logger.info(f"Paid Scout ${payment_amount} for URL discovery (tx: {tx_hash})")
 
             # Confirm payment with Scout

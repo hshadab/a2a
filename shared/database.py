@@ -462,31 +462,32 @@ class Database:
             else:
                 await conn.execute(SCHEMA_SQL)
 
-    def _convert_query_for_psycopg(self, query: str) -> str:
-        """Convert asyncpg-style query ($1, $2) to psycopg-style (%s)."""
+    def _convert_query_for_psycopg(self, query: str, args: tuple) -> tuple:
+        """Convert asyncpg $1,$2 to psycopg %s, expanding repeated refs."""
         import re
-        # First, escape any existing % that aren't parameter markers
-        # (e.g., the % operator used in pg_trgm for similarity)
-        escaped = query.replace('%', '%%')
-        # Then convert $1, $2, etc. to %s
-        converted = re.sub(r'\$(\d+)', '%s', escaped)
-        return converted
+        new_args = []
+        def replacer(match):
+            idx = int(match.group(1)) - 1
+            new_args.append(args[idx])
+            return '%s'
+        converted = re.sub(r'\$(\d+)', replacer, query)
+        return converted, tuple(new_args)
 
     async def _execute(self, conn, query: str, *args):
         """Execute a query with driver abstraction."""
         if self._use_psycopg:
-            psycopg_query = self._convert_query_for_psycopg(query)
+            psycopg_query, expanded_args = self._convert_query_for_psycopg(query, args)
             async with conn.cursor() as cur:
-                await cur.execute(psycopg_query, args if args else None)
+                await cur.execute(psycopg_query, expanded_args if expanded_args else None)
         else:
             await conn.execute(query, *args)
 
     async def _fetchval(self, conn, query: str, *args):
         """Fetch a single value with driver abstraction."""
         if self._use_psycopg:
-            psycopg_query = self._convert_query_for_psycopg(query)
+            psycopg_query, expanded_args = self._convert_query_for_psycopg(query, args)
             async with conn.cursor() as cur:
-                await cur.execute(psycopg_query, args if args else None)
+                await cur.execute(psycopg_query, expanded_args if expanded_args else None)
                 row = await cur.fetchone()
                 return row[0] if row else None
         else:
@@ -495,9 +496,9 @@ class Database:
     async def _fetchrow(self, conn, query: str, *args):
         """Fetch a single row with driver abstraction."""
         if self._use_psycopg:
-            psycopg_query = self._convert_query_for_psycopg(query)
+            psycopg_query, expanded_args = self._convert_query_for_psycopg(query, args)
             async with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
-                await cur.execute(psycopg_query, args if args else None)
+                await cur.execute(psycopg_query, expanded_args if expanded_args else None)
                 return await cur.fetchone()
         else:
             return await conn.fetchrow(query, *args)
@@ -505,9 +506,9 @@ class Database:
     async def _fetch(self, conn, query: str, *args):
         """Fetch multiple rows with driver abstraction."""
         if self._use_psycopg:
-            psycopg_query = self._convert_query_for_psycopg(query)
+            psycopg_query, expanded_args = self._convert_query_for_psycopg(query, args)
             async with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
-                await cur.execute(psycopg_query, args if args else None)
+                await cur.execute(psycopg_query, expanded_args if expanded_args else None)
                 return await cur.fetchall()
         else:
             return await conn.fetch(query, *args)

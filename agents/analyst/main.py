@@ -43,7 +43,8 @@ from shared.database import db
 from shared.events import (
     broadcaster,
     emit_analyst_authorizing, emit_analyst_authorized, emit_spending_proof_verified,
-    emit_analyst_processing, emit_analyst_proving, emit_analyst_response
+    emit_analyst_processing, emit_analyst_proving, emit_analyst_response,
+    emit_payment_sending, emit_payment_sent
 )
 from shared.activity import Activity, ActivityCategory, event_to_activity
 from shared.activity_store import activity_store
@@ -552,6 +553,7 @@ class AnalystAgent:
         payment_amount = payment_due.get("amount", discovery_cost)
 
         try:
+            await emit_payment_sending(request_id, payment_amount, payment_due.get("recipient", config.treasury_address))
             receipt = await self.x402_client.make_payment(
                 recipient=payment_due.get("recipient", config.treasury_address),
                 amount_usdc=payment_amount,
@@ -559,6 +561,7 @@ class AnalystAgent:
             )
             tx_hash = receipt.tx_hash if receipt else "simulated"
             self.total_spent_usdc += payment_amount
+            await emit_payment_sent(request_id, tx_hash, payment_amount)
             logger.info(f"Paid Scout ${payment_amount} for URL discovery (tx: {tx_hash})")
 
             # Confirm payment with Scout
@@ -956,28 +959,28 @@ async def get_payment_activities(limit: int = 50) -> dict:
 @app.get("/debug/db")
 async def debug_db():
     """Debug database connection"""
+    pool = getattr(db, '_psycopg_pool', None) or getattr(db, '_pool', None)
+    use_psycopg = getattr(db, '_use_psycopg', False)
     result = {
         "demo_mode": db._demo_mode,
-        "pool_active": db._pool is not None,
+        "pool_active": pool is not None,
+        "driver": "psycopg" if use_psycopg else "asyncpg",
         "database_url_prefix": config.database_url[:60] + "..." if config.database_url else None,
         "connection_error": getattr(db, '_connection_error', None),
     }
 
-    # Check asyncpg
-    try:
-        import asyncpg
-        result["asyncpg_available"] = True
-        result["asyncpg_version"] = asyncpg.__version__
-    except ImportError as e:
-        result["asyncpg_available"] = False
-        result["asyncpg_error"] = str(e)
-
     # Try to test connection
-    if db._pool:
+    if pool is not None:
         try:
-            async with db._pool.acquire() as conn:
-                row = await conn.fetchrow("SELECT 1 as test")
-                result["connection_test"] = "success"
+            if use_psycopg:
+                async with pool.connection() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("SELECT 1 as test")
+                        result["connection_test"] = "success"
+            else:
+                async with pool.acquire() as conn:
+                    row = await conn.fetchrow("SELECT 1 as test")
+                    result["connection_test"] = "success"
         except Exception as e:
             result["connection_test"] = f"error: {e}"
     else:
