@@ -67,7 +67,8 @@ def get_explorer_url(tx_hash: str, testnet: bool = False) -> Optional[str]:
         return None
 
     base_url = "https://sepolia.basescan.org" if testnet else "https://basescan.org"
-    return f"{base_url}/tx/{tx_hash}"
+    prefixed = tx_hash if tx_hash.startswith("0x") else f"0x{tx_hash}"
+    return f"{base_url}/tx/{prefixed}"
 
 
 def event_to_activity(event_type: str, data: Dict[str, Any]) -> Activity:
