@@ -1,0 +1,29 @@
+[package]
+name = "zkml-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI wrapper for Jolt Atlas zkML proofs"
+
+[[bin]]
+name = "zkml-cli"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+ark-bn254 = "0.5.0"
+ark-serialize = "0.5.0"
+
+# Jolt Atlas dependencies
+jolt-core = { git = "https://github.com/ICME-Lab/zkml-jolt", branch = "dev", package = "jolt-core", default-features = true }
+zkml-jolt-core = { path = "../jolt-atlas/zkml-jolt-core" }
+onnx-tracer = { path = "../jolt-atlas/onnx-tracer" }
+
+[patch.crates-io]
+ark-ff = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }
+ark-ec = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }
+ark-serialize = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }
+ark-bn254 = { git = "https://github.com/a16z/arkworks-algebra", branch = "dev/twist-shout" }

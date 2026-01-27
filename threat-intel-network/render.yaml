@@ -1,0 +1,115 @@
+# Render Blueprint for Threat Intelligence Network (2-Agent Model)
+# Deploy with: https://render.com/docs/infrastructure-as-code
+#
+# Architecture: Scout ←→ Analyst with self-authorization
+# Each agent generates spending proofs and verifies the other's proofs
+
+services:
+  # Scout Agent - URL Discovery with Quality Work Proof + Self-Authorization
+  - type: web
+    name: threat-intel-scout
+    runtime: docker
+    region: oregon
+    plan: standard  # Need more resources for Rust build
+    dockerfilePath: ./Dockerfile.zkml
+    dockerContext: .
+    dockerCommand: ""
+    envVars:
+      - key: AGENT_TYPE
+        value: scout
+      - key: DATABASE_URL
+        fromDatabase:
+          name: threat-intel-db
+          property: internalConnectionString  # Internal connection doesn't need SSL
+      - key: REDIS_URL
+        fromService:
+          name: threat-intel-redis
+          type: redis
+          property: connectionString
+      - key: SCOUT_URL
+        value: https://threat-intel-scout.onrender.com
+      - key: ANALYST_URL
+        value: https://threat-intel-analyst.onrender.com
+      - key: WEBSOCKET_URL
+        value: wss://threat-intel-scout.onrender.com/ws
+      # Shared authorization model for self-authorization
+      - key: JOLT_MODEL_DIR
+        value: /opt/render/project/src/shared/models/authorization
+      - key: AUTH_MODEL_PATH
+        value: /opt/render/project/src/shared/models/authorization/network.onnx
+      # Scout's quality scorer model for work proof
+      - key: QUALITY_SCORER_MODEL_PATH
+        value: /opt/render/project/src/agents/scout/models/jolt/network.onnx
+      - key: PRODUCTION_MODE
+        value: "true"
+      # Note: PRIVATE_KEY and TREASURY_ADDRESS must be set manually in Render dashboard
+    healthCheckPath: /health
+
+  # Analyst Agent - URL Classification with Self-Authorization + Work Proof Verification
+  - type: web
+    name: threat-intel-analyst
+    runtime: docker
+    region: oregon
+    plan: standard  # Need more resources for zkML proofs
+    dockerfilePath: ./Dockerfile.zkml
+    dockerContext: .
+    dockerCommand: ""
+    envVars:
+      - key: AGENT_TYPE
+        value: analyst
+      - key: JOLT_MODEL_DIR
+        value: /opt/render/project/src/agents/analyst/models/jolt
+      - key: CLASSIFIER_MODEL_PATH
+        value: /opt/render/project/src/agents/analyst/models/jolt/network.onnx
+      # Shared authorization model for self-authorization
+      - key: AUTH_MODEL_PATH
+        value: /opt/render/project/src/shared/models/authorization/network.onnx
+      - key: DATABASE_URL
+        fromDatabase:
+          name: threat-intel-db
+          property: internalConnectionString  # Internal connection doesn't need SSL
+      - key: ANALYST_URL
+        value: https://threat-intel-analyst.onrender.com
+      - key: SCOUT_URL
+        value: https://threat-intel-scout.onrender.com
+      - key: PRODUCTION_MODE
+        value: "true"
+      - key: REDIS_URL
+        fromService:
+          name: threat-intel-redis
+          type: redis
+      # Note: PRIVATE_KEY and TREASURY_ADDRESS must be set manually in Render dashboard
+    healthCheckPath: /health
+
+  # UI Dashboard - Next.js Frontend (2-Agent Model)
+  - type: web
+    name: threat-intel-ui
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: cd ui && npm install && npm run build
+    startCommand: cd ui && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SCOUT_URL
+        value: https://threat-intel-scout.onrender.com
+      - key: NEXT_PUBLIC_ANALYST_URL
+        value: https://threat-intel-analyst.onrender.com
+      - key: NEXT_PUBLIC_WS_URL
+        value: wss://threat-intel-scout.onrender.com/ws
+    healthCheckPath: /
+
+  # Redis for Event Pub/Sub
+  - type: redis
+    name: threat-intel-redis
+    region: oregon
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+
+# PostgreSQL Database
+databases:
+  - name: threat-intel-db
+    region: oregon
+    plan: starter
+    postgresMajorVersion: 15

@@ -1,0 +1,862 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground: #ffffff;
+  --background: #0a0a0f;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00f0ff40;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff60;
+}
+
+/* Custom utilities */
+.glow-text {
+  text-shadow: 0 0 10px currentColor;
+}
+
+.glow-border {
+  box-shadow: 0 0 10px currentColor, inset 0 0 10px currentColor;
+}
+
+.card {
+  @apply bg-[#1a1a1f] border border-[#3a3a45] rounded-lg;
+}
+
+.stat-value {
+  @apply text-3xl font-bold tabular-nums;
+}
+
+.stat-label {
+  @apply text-sm text-gray-400 uppercase tracking-wider;
+}
+
+/* Animation for new items */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Pulse animation for active elements */
+@keyframes activePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-active {
+  animation: activePulse 2s ease-in-out infinite;
+}
+
+/* Agent Triangle Visualization */
+.agent-triangle {
+  position: relative;
+  width: 100%;
+  height: 400px;
+}
+
+.agent-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.agent-node:hover {
+  transform: scale(1.05);
+}
+
+.agent-node.active {
+  filter: drop-shadow(0 0 20px currentColor);
+}
+
+.agent-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.agent-avatar::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0.3;
+}
+
+.agent-avatar.working::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px dashed currentColor;
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Connection lines */
+.connection-line {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.connection-path {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.connection-path.idle {
+  stroke: #374151;
+  stroke-dasharray: 8 4;
+}
+
+.connection-path.active {
+  stroke: url(#gradient-active);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* Animated particles along path */
+@keyframes flowParticle {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+.flow-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  offset-rotate: 0deg;
+  animation: flowParticle 2s linear infinite;
+}
+
+.flow-particle:nth-child(2) { animation-delay: 0.4s; }
+.flow-particle:nth-child(3) { animation-delay: 0.8s; }
+.flow-particle:nth-child(4) { animation-delay: 1.2s; }
+.flow-particle:nth-child(5) { animation-delay: 1.6s; }
+
+/* Marching ants animation */
+@keyframes marchingAnts {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.marching-ants {
+  animation: marchingAnts 0.5s linear infinite;
+}
+
+/* Pulse ring effect */
+@keyframes pulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: pulseRing 1.5s ease-out infinite;
+}
+
+/* Agent expressions */
+.agent-eyes {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.agent-eye {
+  width: 10px;
+  height: 10px;
+  background: currentColor;
+  border-radius: 50%;
+  position: relative;
+}
+
+.agent-eye.looking-left::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #000;
+  border-radius: 50%;
+  top: 3px;
+  left: 1px;
+}
+
+.agent-eye.looking-right::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #000;
+  border-radius: 50%;
+  top: 3px;
+  right: 1px;
+}
+
+.agent-eye.looking-down::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #000;
+  border-radius: 50%;
+  bottom: 1px;
+  left: 3px;
+}
+
+/* Treasury */
+.treasury-node {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Data flow indicators */
+@keyframes dataFlow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.data-indicator {
+  animation: dataFlow 1s ease-in-out infinite;
+}
+
+/* Proof glow */
+@keyframes proofGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+  }
+}
+
+.proving {
+  animation: proofGlow 0.5s ease-in-out infinite;
+}
+
+/* Pipeline Flow Animations */
+@keyframes flowParticleHorizontal {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 8px);
+    opacity: 0;
+  }
+}
+
+.animate-flow-particle {
+  animation: flowParticleHorizontal 1.5s ease-in-out forwards;
+}
+
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 8s linear infinite;
+}
+
+/* Agent Card Glow States */
+.agent-card-proving {
+  animation: proofGlow 0.5s ease-in-out infinite;
+}
+
+.agent-card-working {
+  animation: workingPulse 2s ease-in-out infinite;
+}
+
+@keyframes workingPulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.1);
+  }
+}
+
+/* ============================================
+   ENHANCED GLOW EFFECTS
+   ============================================ */
+
+/* Breathing glow for proving state - shadow only, no transform */
+@keyframes glowBreathe {
+  0%, 100% {
+    box-shadow:
+      0 0 15px var(--glow-color, #a855f7),
+      0 0 30px var(--glow-color, #a855f7);
+  }
+  50% {
+    box-shadow:
+      0 0 25px var(--glow-color, #a855f7),
+      0 0 50px var(--glow-color, #a855f7),
+      0 0 75px var(--glow-color, #a855f7);
+  }
+}
+
+.glow-breathe {
+  animation: glowBreathe 1.5s ease-in-out infinite;
+}
+
+/* Ripple effect emanating from agent */
+@keyframes rippleOut {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.ripple-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid var(--glow-color, #a855f7);
+  animation: rippleOut 2s ease-out infinite;
+}
+
+.ripple-ring:nth-child(2) { animation-delay: 0.5s; }
+.ripple-ring:nth-child(3) { animation-delay: 1s; }
+
+/* Electric arc effect */
+@keyframes electricArc {
+  0%, 100% { opacity: 0.3; }
+  25% { opacity: 1; }
+  50% { opacity: 0.5; }
+  75% { opacity: 0.9; }
+}
+
+.electric-border {
+  animation: electricArc 0.3s steps(4) infinite;
+}
+
+/* ============================================
+   PROGRESS RING ANIMATIONS
+   ============================================ */
+
+@keyframes progressRotate {
+  from { transform: rotate(-90deg); }
+  to { transform: rotate(270deg); }
+}
+
+.progress-ring {
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+
+.progress-ring-bg {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.progress-ring-fill {
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.progress-ring-indeterminate {
+  animation: progressRotate 2s linear infinite;
+  stroke-dasharray: 60 200;
+}
+
+/* ============================================
+   SVG CONNECTION LINE ANIMATIONS
+   ============================================ */
+
+/* Flowing dash animation */
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.dash-flow {
+  stroke-dasharray: 12 6;
+  animation: dashFlow 1s linear infinite;
+}
+
+/* Gradient pulse along line */
+@keyframes gradientPulse {
+  0% { stop-color: #fbbf24; stop-opacity: 0.2; }
+  50% { stop-color: #fbbf24; stop-opacity: 1; }
+  100% { stop-color: #fbbf24; stop-opacity: 0.2; }
+}
+
+/* Particle traveling along path */
+@keyframes travelPath {
+  0% { offset-distance: 0%; opacity: 0; }
+  5% { opacity: 1; }
+  95% { opacity: 1; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.path-particle {
+  offset-rotate: 0deg;
+  animation: travelPath 2s ease-in-out infinite;
+}
+
+.path-particle:nth-child(1) { animation-delay: 0s; }
+.path-particle:nth-child(2) { animation-delay: 0.4s; }
+.path-particle:nth-child(3) { animation-delay: 0.8s; }
+.path-particle:nth-child(4) { animation-delay: 1.2s; }
+.path-particle:nth-child(5) { animation-delay: 1.6s; }
+
+/* Payment annotation floating */
+@keyframes floatAnnotation {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.float-annotation {
+  animation: floatAnnotation 2s ease-in-out infinite;
+}
+
+/* Slide along path for annotations */
+@keyframes slideAlongPath {
+  0% { left: 10%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { left: 90%; opacity: 0; }
+}
+
+.slide-annotation {
+  animation: slideAlongPath 3s ease-in-out infinite;
+}
+
+/* ============================================
+   TREASURY WIDGET STYLES
+   ============================================ */
+
+.treasury-widget {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+.treasury-widget:hover {
+  border-color: rgba(34, 197, 94, 0.5);
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+}
+
+@keyframes balancePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.balance-updating {
+  animation: balancePulse 0.5s ease-in-out;
+}
+
+/* Coin flip animation for payments */
+@keyframes coinFlip {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+
+.coin-flip {
+  animation: coinFlip 0.6s ease-in-out;
+}
+
+/* ============================================
+   SUCCESS CELEBRATION EFFECTS
+   ============================================ */
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100px) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti-particle {
+  animation: confettiFall 1s ease-out forwards;
+}
+
+@keyframes checkmarkDraw {
+  0% { stroke-dashoffset: 100; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.checkmark-animated {
+  stroke-dasharray: 100;
+  animation: checkmarkDraw 0.5s ease-out forwards;
+}
+
+/* ============================================
+   ENHANCED STATUS INDICATORS
+   ============================================ */
+
+@keyframes statusBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.status-active {
+  animation: statusBlink 1s ease-in-out infinite;
+}
+
+.status-dot {
+  position: relative;
+}
+
+.status-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.3;
+  animation: rippleOut 2s ease-out infinite;
+}
+
+/* ============================================
+   ALWAYS-ON AMBIENT ANIMATIONS
+   ============================================ */
+
+/* Ambient pulse for connection lines (always active) */
+@keyframes ambientPulse {
+  0%, 100% {
+    stroke-opacity: 0.3;
+    filter: drop-shadow(0 0 2px currentColor);
+  }
+  50% {
+    stroke-opacity: 0.6;
+    filter: drop-shadow(0 0 8px currentColor);
+  }
+}
+
+.connection-ambient {
+  animation: ambientPulse 3s ease-in-out infinite;
+}
+
+/* Subtle border glow for idle agents - no transform */
+@keyframes idleGlow {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--glow-color, #3b82f6)15;
+  }
+  50% {
+    box-shadow: 0 0 15px var(--glow-color, #3b82f6)30;
+  }
+}
+
+.idle-glow {
+  animation: idleGlow 4s ease-in-out infinite;
+}
+
+/* Subtle ambient particles flowing */
+@keyframes ambientFlow {
+  0% { offset-distance: 0%; opacity: 0; }
+  20% { opacity: 0.3; }
+  80% { opacity: 0.3; }
+  100% { offset-distance: 100%; opacity: 0; }
+}
+
+.ambient-particle {
+  offset-rotate: 0deg;
+  animation: ambientFlow 6s ease-in-out infinite;
+}
+
+.ambient-particle:nth-child(1) { animation-delay: 0s; }
+.ambient-particle:nth-child(2) { animation-delay: 2s; }
+.ambient-particle:nth-child(3) { animation-delay: 4s; }
+
+/* Network alive indicator - subtle opacity pulse, no transform */
+.network-alive {
+  /* No animation - just a class marker */
+}
+
+/* Monitoring text dots animation */
+@keyframes dotsAnimation {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+.monitoring-dots::after {
+  content: '...';
+  animation: dotsAnimation 1.5s ease-in-out infinite;
+}
+
+/* Subtle glow pulse for idle avatars - no scaling/shaking */
+@keyframes avatarIdleGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px var(--glow-color, #3b82f6)30;
+  }
+  50% {
+    box-shadow: 0 0 20px var(--glow-color, #3b82f6)50;
+  }
+}
+
+.avatar-idle {
+  animation: avatarIdleGlow 3s ease-in-out infinite;
+}
+
+/* Subtle scan line for idle agents */
+@keyframes scanLine {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 200%; }
+}
+
+.scan-effect {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.05) 50%,
+    transparent 100%
+  );
+  background-size: 100% 50%;
+  animation: scanLine 4s linear infinite;
+}
+
+/* Continuous connection flow */
+@keyframes continuousFlow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -48; }
+}
+
+.continuous-flow {
+  stroke-dasharray: 12 12;
+  animation: continuousFlow 2s linear infinite;
+}
+
+/* Data stream dots */
+@keyframes streamDot {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+.stream-dot {
+  animation: streamDot 2s ease-in-out infinite;
+}
+
+.stream-dot:nth-child(2) { animation-delay: 0.3s; }
+.stream-dot:nth-child(3) { animation-delay: 0.6s; }
+.stream-dot:nth-child(4) { animation-delay: 0.9s; }
+.stream-dot:nth-child(5) { animation-delay: 1.2s; }
+
+/* ============================================
+   ANIMATED ARROW CONNECTIONS
+   ============================================ */
+
+/* Arrow marker animation */
+@keyframes arrowPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.arrow-marker {
+  animation: arrowPulse 2s ease-in-out infinite;
+}
+
+/* Flowing line with arrow heads */
+@keyframes flowLine {
+  0% { stroke-dashoffset: 20; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.flow-line {
+  stroke-dasharray: 10 10;
+  animation: flowLine 1s linear infinite;
+}
+
+/* Bidirectional flow */
+@keyframes biFlow {
+  0%, 100% { opacity: 0.3; }
+  25% { opacity: 1; }
+  50% { opacity: 0.3; }
+  75% { opacity: 1; }
+}
+
+.bi-flow {
+  animation: biFlow 3s ease-in-out infinite;
+}
+
+/* ============================================
+   PAYMENT ARROW ANIMATIONS
+   ============================================ */
+
+/* Payment arrow animation - left to right */
+@keyframes paymentArrowLTR {
+  0% {
+    stroke-dasharray: 0 100;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dasharray: 100 0;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.payment-arrow-animate {
+  animation: paymentArrowLTR 0.8s ease-out forwards;
+  filter: drop-shadow(0 0 6px #22c55e);
+}
+
+/* Payment arrow animation - right to left */
+@keyframes paymentArrowRTL {
+  0% {
+    stroke-dasharray: 0 100;
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dasharray: 100 0;
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.payment-arrow-animate-reverse {
+  animation: paymentArrowRTL 0.8s ease-out forwards;
+  filter: drop-shadow(0 0 6px #22c55e);
+}
+
+/* Payment amount label animation */
+@keyframes paymentAmountPop {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.payment-amount-animate {
+  animation: paymentAmountPop 1.5s ease-out forwards;
+  font-weight: bold;
+}
+
+/* Pulse animation for status dots */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Remove all backdrop-blur from old styles */
+.treasury-widget {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  /* removed: backdrop-filter: blur(8px); */
+}

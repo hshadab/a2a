@@ -1,0 +1,71 @@
+# Dockerfile for agents with zkML support
+# Downloads pre-built zkml-cli binary from GitHub Releases when available
+
+FROM python:3.11-slim
+
+ARG AGENT_TYPE=scout
+# Cache bust arg to force rebuild when model files change
+ARG CACHE_BUST=20260124b
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download pre-built Jolt Atlas proof binary from zkx402 releases
+# This is a 143MB binary that generates REAL zkML proofs
+RUN echo "Downloading Jolt Atlas prover binary (143MB)..." && \
+    curl -fSL --retry 3 --retry-delay 5 -o /usr/local/bin/proof_json_output \
+    "https://github.com/hshadab/zkx402/releases/download/jolt-binary-v1/proof_json_output" && \
+    chmod +x /usr/local/bin/proof_json_output && \
+    ls -la /usr/local/bin/proof_json_output && \
+    echo "Jolt Atlas prover downloaded and verified!" || \
+    (echo "WARNING: Failed to download prover, will use simulated proofs" && rm -f /usr/local/bin/proof_json_output)
+
+# Create the directory structure matching the original repo
+WORKDIR /opt/render/project/src
+
+# Copy shared module
+COPY shared/ ./shared/
+
+# Copy all agents (we'll run the specific one based on AGENT_TYPE)
+# Bust cache: model updated 2026-01-24 to fix MAX_TENSOR_SIZE
+COPY agents/ ./agents/
+
+# Verify models were copied (cache bust check)
+RUN echo "Policy model:" && ls -la agents/policy/models/jolt/ && sha256sum agents/policy/models/jolt/network.onnx && \
+    echo "Analyst model:" && ls -la agents/analyst/models/jolt/ && sha256sum agents/analyst/models/jolt/network.onnx || \
+    echo "Model check completed"
+
+# Copy base requirements and install
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install agent-specific dependencies
+RUN if [ -f agents/${AGENT_TYPE}/requirements.txt ]; then \
+    pip install --no-cache-dir -r agents/${AGENT_TYPE}/requirements.txt; \
+    fi
+
+# Set environment
+ENV JOLT_MODEL_DIR=/opt/render/project/src/agents/${AGENT_TYPE}/models/jolt
+ENV ZKML_CLI_PATH=/usr/local/bin/proof_json_output
+ENV PYTHONPATH=/opt/render/project/src
+# Model paths for both agents (absolute paths in container)
+ENV AUTH_MODEL_PATH=/opt/render/project/src/agents/policy/models/jolt/network.onnx
+ENV CLASSIFIER_MODEL_PATH=/opt/render/project/src/agents/analyst/models/jolt/network.onnx
+
+# Port from environment (Render sets PORT)
+ENV PORT=8000
+EXPOSE ${PORT}
+
+# Working directory is the agent's directory
+WORKDIR /opt/render/project/src/agents/${AGENT_TYPE}
+
+# Health check - longer start period for database connection
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Run the agent
+CMD python -m uvicorn main:app --host 0.0.0.0 --port ${PORT}

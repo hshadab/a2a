@@ -1,0 +1,17 @@
+{
+  "model_type": "url_classifier",
+  "input_size": 32,
+  "hidden_size": 16,
+  "output_size": 4,
+  "architecture": "32 -> 16 -> 4 MLP",
+  "max_tensor_size": 512,
+  "prover_compatible": true,
+  "classes": [
+    "PHISHING",
+    "SAFE",
+    "SUSPICIOUS",
+    "UNKNOWN"
+  ],
+  "training_accuracy": 99.38750267028809,
+  "validation_accuracy": 100.0
+}
