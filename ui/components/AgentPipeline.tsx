@@ -291,9 +291,9 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           walletAddress={WALLET_ADDRESSES.analyst}
           walletBalance={walletBalances.analyst}
           stats={{
-            urlsProcessed: stats?.phishing_count || 0,
-            earned: stats?.analyst_paid_usdc || 0,
-            spent: stats?.policy_paid_usdc || 0,
+            urlsProcessed: stats?.total_urls || 0,
+            earned: stats?.policy_paid_usdc || 0,
+            spent: stats?.analyst_paid_usdc || 0,
           }}
           models={[
             { name: 'Authorization', size: '4.2 KB', shape: '[7]→[2]', commitment: '44965f00586bff57fa42b9e58ddaf3b2159bc2fd' },
@@ -412,8 +412,8 @@ export default function AgentPipeline({ events, lastEvent, stats }: AgentPipelin
           walletBalance={walletBalances.scout}
           stats={{
             urlsProcessed: stats?.total_urls || 0,
-            earned: stats?.policy_paid_usdc || 0,
-            spent: stats?.analyst_paid_usdc || 0,
+            earned: stats?.analyst_paid_usdc || 0,
+            spent: stats?.policy_paid_usdc || 0,
           }}
           models={[
             { name: 'Authorization', size: '4.2 KB', shape: '[7]→[2]', commitment: '44965f00586bff57fa42b9e58ddaf3b2159bc2fd' },
