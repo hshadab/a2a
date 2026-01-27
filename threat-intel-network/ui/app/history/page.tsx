@@ -307,7 +307,7 @@ function ActivityListItem({ activity }: { activity: Activity }) {
         {/* Timestamp and Agent */}
         <div className="text-right flex-shrink-0">
           <p className="text-xs text-gray-400">
-            {new Date(activity.timestamp).toLocaleTimeString()}
+            {new Date(activity.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })} EST
           </p>
           <p className="text-[10px] text-gray-600 mt-1 px-1.5 py-0.5 bg-gray-800/50 rounded inline-block">
             {activity.agent}

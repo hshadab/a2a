@@ -229,14 +229,14 @@ function StatCard({
 }
 
 function ActivityRow({ activity }: { activity: ActivityType }) {
-  const time = new Date(activity.timestamp).toLocaleTimeString();
+  const time = new Date(activity.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) + ' EST';
   const icon = getActivityIcon(activity);
   const color = getActivityColor(activity);
 
   return (
     <div className={`text-xs md:text-sm py-2 border-b border-gray-800/50 animate-slide-in ${color}`}>
       <div className="flex items-start gap-2 md:gap-3">
-        <span className="text-gray-500 w-14 md:w-20 flex-shrink-0 text-[10px] md:text-sm">{time}</span>
+        <span className="text-gray-500 w-36 md:w-48 flex-shrink-0 text-[10px] md:text-sm">{time}</span>
         <span className="w-4 md:w-6">{icon}</span>
         <div className="flex-1">
           <span className="font-medium">{activity.title}</span>
@@ -271,7 +271,7 @@ function ActivityRow({ activity }: { activity: ActivityType }) {
 }
 
 function EventRow({ event }: { event: { type: string; timestamp: string; data: Record<string, any> } }) {
-  const time = new Date(event.timestamp).toLocaleTimeString();
+  const time = new Date(event.timestamp).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) + ' EST';
   const icon = getEventIcon(event.type, event.data);
   const color = getEventColor(event.type, event.data);
 
@@ -345,7 +345,7 @@ function EventRow({ event }: { event: { type: string; timestamp: string; data: R
   return (
     <div className={`text-xs md:text-sm py-2 border-b border-gray-800/50 animate-slide-in ${color}`}>
       <div className="flex items-start gap-2 md:gap-3">
-        <span className="text-gray-500 w-14 md:w-20 flex-shrink-0 text-[10px] md:text-sm">{time}</span>
+        <span className="text-gray-500 w-36 md:w-48 flex-shrink-0 text-[10px] md:text-sm">{time}</span>
         <span className="w-4 md:w-6">{icon}</span>
         <span className="flex-1 break-words">{getMessage()}</span>
         {(event.data.request_id || event.data.batch_id) && (
