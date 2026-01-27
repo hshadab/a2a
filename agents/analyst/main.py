@@ -269,8 +269,10 @@ class AnalystAgent:
                 self.classifications_today = int(stats.get(b"total", 0))
                 self.phishing_detected_today = int(stats.get(b"phishing", 0))
                 self.total_spent_usdc = float(stats.get(b"spent_usdc", 0))
+                self.total_earned_usdc = float(stats.get(b"earned_usdc", 0))
+                self.total_feedback_received = float(stats.get(b"feedback_received_usdc", 0))
                 self.batches_processed = int(stats.get(b"batches", 0))
-                logger.info(f"Loaded stats from Redis: {self.classifications_today} classifications")
+                logger.info(f"Loaded stats from Redis: {self.classifications_today} classifications, earned ${self.total_earned_usdc}, feedback ${self.total_feedback_received}")
 
             # Load recent classifications
             history = await r.lrange("analyst:history", 0, self.max_history - 1)
@@ -297,6 +299,8 @@ class AnalystAgent:
             if classification.get("classification") == "PHISHING":
                 await r.hincrby("analyst:stats", "phishing", 1)
             await r.hset("analyst:stats", "spent_usdc", str(self.total_spent_usdc))
+            await r.hset("analyst:stats", "earned_usdc", str(self.total_earned_usdc))
+            await r.hset("analyst:stats", "feedback_received_usdc", str(self.total_feedback_received))
             await r.hset("analyst:stats", "batches", str(self.batches_processed))
 
         except Exception as e:
@@ -1083,8 +1087,14 @@ async def confirm_payment(request: ConfirmPaymentRequest):
             logger.error(f"Payment verification error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Record earnings
+    # Record earnings and persist to Redis
     analyst_agent.total_earned_usdc += request.amount
+    try:
+        r = await analyst_agent._get_redis()
+        if r:
+            await r.hset("analyst:stats", "earned_usdc", str(analyst_agent.total_earned_usdc))
+    except Exception:
+        pass
     logger.info(f"Payment confirmed for {request.request_id}: ${request.amount} USDC (tx: {request.tx_hash})")
 
     return {
@@ -1136,8 +1146,14 @@ async def confirm_feedback_payment(request: ConfirmFeedbackPaymentRequest):
             logger.error(f"Feedback payment verification error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    # Record feedback earnings
+    # Record feedback earnings and persist to Redis
     analyst_agent.total_feedback_received += request.amount
+    try:
+        r = await analyst_agent._get_redis()
+        if r:
+            await r.hset("analyst:stats", "feedback_received_usdc", str(analyst_agent.total_feedback_received))
+    except Exception:
+        pass
     logger.info(f"Feedback payment confirmed for {request.request_id}: ${request.amount} USDC (tx: {request.tx_hash})")
 
     return {
