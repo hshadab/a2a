@@ -466,11 +466,18 @@ class Database:
         """Convert asyncpg $1,$2 to psycopg %s, expanding repeated refs."""
         import re
         new_args = []
+        counter = [0]
         def replacer(match):
             idx = int(match.group(1)) - 1
             new_args.append(args[idx])
-            return '%s'
+            counter[0] += 1
+            # Use a unique placeholder to avoid collision with literal %
+            return f'\x00PARAM{counter[0]}\x00'
         converted = re.sub(r'\$(\d+)', replacer, query)
+        # Escape any literal % (e.g. pg_trgm % operator) to %%
+        converted = converted.replace('%', '%%')
+        # Restore parameter placeholders to %s
+        converted = re.sub(r'\x00PARAM\d+\x00', '%s', converted)
         return converted, tuple(new_args)
 
     async def _execute(self, conn, query: str, *args):
