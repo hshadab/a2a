@@ -50,3 +50,4 @@ Thumbs.db
 # *.onnx
 zkml-cli/target/
 bin/
+tsconfig.tsbuildinfo
