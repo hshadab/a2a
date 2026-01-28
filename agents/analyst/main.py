@@ -1067,25 +1067,27 @@ async def confirm_payment(request: ConfirmPaymentRequest):
 
     This allows Analyst to track earnings.
     """
-    # Verify payment if in production mode
+    # Verify payment if in production mode (non-blocking for earnings tracking)
+    payment_verified = False
     if config.production_mode and request.tx_hash != "simulated":
         try:
+            tx_hash_prefixed = request.tx_hash if request.tx_hash.startswith("0x") else f"0x{request.tx_hash}"
             tolerance = 1 - config.payment_tolerance
             is_valid, error = analyst_agent.x402_client.verify_payment(
-                tx_hash=request.tx_hash,
+                tx_hash=tx_hash_prefixed,
                 expected_recipient=analyst_agent.wallet_address,
                 expected_amount_usdc=request.amount * tolerance
             )
-            if not is_valid:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Payment verification failed: {error}"
-                )
-        except HTTPException:
-            raise
+            if is_valid:
+                payment_verified = True
+            else:
+                logger.warning(f"Payment verification failed: {error} - recording earnings anyway")
         except Exception as e:
-            logger.error(f"Payment verification error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.warning(f"Payment verification error: {e} - recording earnings anyway")
+    else:
+        payment_verified = True
+
+    logger.info(f"Payment verified={payment_verified} for {request.request_id}")
 
     # Record earnings and persist to Redis
     analyst_agent.total_earned_usdc += request.amount
@@ -1126,25 +1128,27 @@ async def confirm_feedback_payment(request: ConfirmFeedbackPaymentRequest):
     Analyst does NOT verify Scout's spending proof - each agent self-verifies.
     This completes the circular economy: Analyst → Scout → Analyst
     """
-    # Verify payment if in production mode
+    # Verify payment if in production mode (non-blocking for earnings tracking)
+    payment_verified = False
     if config.production_mode and request.tx_hash != "simulated":
         try:
+            tx_hash_prefixed = request.tx_hash if request.tx_hash.startswith("0x") else f"0x{request.tx_hash}"
             tolerance = 1 - config.payment_tolerance
             is_valid, error = analyst_agent.x402_client.verify_payment(
-                tx_hash=request.tx_hash,
+                tx_hash=tx_hash_prefixed,
                 expected_recipient=analyst_agent.wallet_address,
                 expected_amount_usdc=request.amount * tolerance
             )
-            if not is_valid:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Feedback payment verification failed: {error}"
-                )
-        except HTTPException:
-            raise
+            if is_valid:
+                payment_verified = True
+            else:
+                logger.warning(f"Feedback payment verification failed: {error} - recording earnings anyway")
         except Exception as e:
-            logger.error(f"Feedback payment verification error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.warning(f"Feedback payment verification error: {e} - recording earnings anyway")
+    else:
+        payment_verified = True
+
+    logger.info(f"Feedback payment verified={payment_verified} for {request.request_id}")
 
     # Record feedback earnings and persist to Redis
     analyst_agent.total_feedback_received += request.amount

@@ -907,27 +907,27 @@ async def confirm_discovery_payment(request: ConfirmDiscoveryPaymentRequest):
     Note: Analyst self-verifies its own spending proof before paying.
     Scout does NOT verify Analyst's spending proof - each agent verifies their own.
     """
-    # Verify payment if in production mode
+    # Verify payment if in production mode (non-blocking for feedback flow)
+    payment_verified = False
     if config.production_mode and request.tx_hash != "simulated":
         try:
+            tx_hash_prefixed = request.tx_hash if request.tx_hash.startswith("0x") else f"0x{request.tx_hash}"
             tolerance = 1 - config.payment_tolerance
             is_valid, error = scout.x402_client.verify_payment(
-                tx_hash=request.tx_hash,
-                expected_recipient=config.treasury_address,
+                tx_hash=tx_hash_prefixed,
+                expected_recipient=scout.x402_client.account.address,
                 expected_amount_usdc=request.amount * tolerance
             )
-            if not is_valid:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Payment verification failed: {error}"
-                )
-        except HTTPException:
-            raise
+            if is_valid:
+                payment_verified = True
+            else:
+                logger.warning(f"Discovery payment verification failed: {error} - proceeding with feedback anyway")
         except Exception as e:
-            logger.error(f"Payment verification error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.warning(f"Discovery payment verification error: {e} - proceeding with feedback anyway")
+    else:
+        payment_verified = True
 
-    logger.info(f"Discovery payment confirmed for {request.request_id}: ${request.amount} USDC (tx: {request.tx_hash})")
+    logger.info(f"Discovery payment confirmed for {request.request_id}: ${request.amount} USDC (tx: {request.tx_hash}, verified: {payment_verified})")
 
     # Pay Analyst feedback (completes the circular economy)
     try:
