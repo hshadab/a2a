@@ -727,18 +727,34 @@ class JoltAtlasProver:
                     "scores": scores.tolist()
                 }
 
-            # Fallback: simulated classification
-            risk_score = sum(inputs[:10]) / 10 if len(inputs) >= 10 else 0.5
+            # Fallback: simulated classification using weighted risk features
+            # Features: 0=url_len, 1=domain_len, 5=has_ip, 6=has_port, 7=https,
+            #   10=digit_ratio, 11=entropy, 12=tld_risk, 13=typosquat,
+            #   14=brand_match, 18=suspicious_path, 19=suspicious_keywords
+            if len(inputs) >= 20:
+                risk_score = (
+                    inputs[5] * 0.15 +   # has_ip_address (strong signal)
+                    inputs[6] * 0.05 +   # has_port
+                    (1.0 - inputs[7]) * 0.10 +  # no HTTPS
+                    inputs[10] * 0.05 +  # digit_ratio
+                    inputs[12] * 0.20 +  # tld_risk_score (strong signal)
+                    inputs[13] * 0.20 +  # typosquat_score (strong signal)
+                    inputs[14] * 0.10 +  # brand_match
+                    inputs[18] * 0.10 +  # has_suspicious_path
+                    min(inputs[19], 1.0) * 0.05  # suspicious_keyword_count
+                )
+            else:
+                risk_score = sum(inputs[:10]) / 10 if len(inputs) >= 10 else 0.5
 
-            if risk_score > 0.7:
+            if risk_score > 0.55:
                 classification = "PHISHING"
-                confidence = min(0.99, risk_score)
-            elif risk_score < 0.3:
+                confidence = min(0.99, 0.5 + risk_score * 0.5)
+            elif risk_score > 0.3:
+                classification = "SUSPICIOUS"
+                confidence = min(0.95, 0.5 + risk_score * 0.3)
+            else:
                 classification = "SAFE"
                 confidence = min(0.99, 1 - risk_score)
-            else:
-                classification = "SUSPICIOUS"
-                confidence = 0.6
 
             return {
                 "classification": classification,

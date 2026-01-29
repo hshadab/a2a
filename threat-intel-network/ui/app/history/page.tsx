@@ -28,7 +28,7 @@ import {
   Database,
 } from 'lucide-react';
 
-type TabType = 'all' | 'classifications' | 'payments' | 'proofs';
+type TabType = 'all' | 'threats' | 'classifications' | 'payments' | 'proofs';
 
 export default function HistoryPage() {
   const [stats, setStats] = useState<NetworkStats | null>(null);
@@ -47,6 +47,12 @@ export default function HistoryPage() {
       if (activeTab === 'all') {
         const activitiesData = await getActivities(100);
         setActivities(activitiesData.activities);
+      } else if (activeTab === 'threats') {
+        const activitiesData = await getActivities(200, 'classification');
+        const threats = activitiesData.activities.filter(
+          (a: Activity) => a.classification === 'PHISHING' || a.classification === 'SUSPICIOUS'
+        );
+        setActivities(threats);
       } else if (activeTab === 'classifications') {
         const activitiesData = await getActivities(100, 'classification');
         setActivities(activitiesData.activities);
@@ -86,6 +92,7 @@ export default function HistoryPage() {
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'all', label: 'All', icon: <Database size={14} /> },
+    { id: 'threats', label: 'Threats', icon: <AlertTriangle size={14} /> },
     { id: 'classifications', label: 'Classifications', icon: <Shield size={14} /> },
     { id: 'payments', label: 'Payments', icon: <DollarSign size={14} /> },
     { id: 'proofs', label: 'Proofs', icon: <Lock size={14} /> },
@@ -137,6 +144,12 @@ export default function HistoryPage() {
             <p className="text-xl md:text-2xl font-bold text-red-400">{formatNumber(stats?.phishing_count || 0)}</p>
             <p className="text-[10px] md:text-xs text-gray-500">Phishing</p>
           </div>
+          {activeTab === 'threats' && (
+            <div className="text-center">
+              <p className="text-xl md:text-2xl font-bold text-yellow-400">{formatNumber(stats?.suspicious_count || 0)}</p>
+              <p className="text-[10px] md:text-xs text-gray-500">Suspicious</p>
+            </div>
+          )}
           {activeTab === 'payments' && (
             <div className="text-center">
               <p className="text-xl md:text-2xl font-bold text-yellow-400">{formatUSDC(totalPayments)}</p>
