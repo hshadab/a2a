@@ -462,6 +462,16 @@ let proof = jolt_atlas::prove(
             Jolt Atlas zkML
             <ExternalLink size={12} />
           </a>
+          <a
+            href="https://github.com/hshadab/a2a"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-colors text-sm"
+          >
+            <Github size={16} />
+            ThreatProof Source
+            <ExternalLink size={12} />
+          </a>
         </div>
       </section>
     </div>
